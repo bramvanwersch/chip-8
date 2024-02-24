@@ -25,8 +25,6 @@ fn main() {
     ram.set(5, 0x00);
     ram.sets(6, &add_thrice);
 
-    ram.show(0, 2);
-
     cpu.run(&mut ram);
     ram.show(0, 2);
     println!("{}, {}", cpu.read_register(0), cpu.read_register(1));

@@ -67,6 +67,7 @@ impl CPU {
                 (0x8, _, _, 0x4) => self.add(x, y),
                 (0xA, _, _, _) => self.set_i(nnn),
                 (0xF, _, 0x5, 0x5) => self.copy_to_memory(x, ram),
+                (0xF, _, 0x6, 0x5) => self.copy_from_memory(x, ram),
                 _ => { return; }
                 // _ => todo!("opcode {:04x}", opcode)
             }
@@ -114,6 +115,12 @@ impl CPU {
         // copies the values of registers V0 through Vx into memory, starting at the address in i
         for nr in 0..x as usize + 1 {
             ram.set(self.i as usize + nr, self.registers[nr]);
+        }
+    }
+
+    fn copy_from_memory(&mut self, x: u8, ram: &mut RAM){
+        for nr in 0..x as usize + 1 {
+            self.registers[nr] = ram.get((self.i as usize) + nr);
         }
     }
 }
@@ -208,11 +215,26 @@ mod tests {
         ram.set_u16(0, 0xA010);
         ram.set_u16(2, 0xF455);
         cpu.run(&mut ram);
-        ram.show(0, 20);
         assert_eq!(ram.get(0x10), 1);
         assert_eq!(ram.get(0x11), 255);
         assert_eq!(ram.get(0x12), 2);
         assert_eq!(ram.get(0x13), 100);
+    }
+
+    #[test]
+    fn test_copy_from_memory() {
+        // integer simply overflows
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+
+        ram.set_u16(0, 0xA010);
+        ram.set_u16(2, 0xF265);
+        ram.set(0x10, 1);
+        ram.set(0x11, 52);
+        cpu.run(&mut ram);
+        ram.show(0, 20);
+        assert_eq!(cpu.read_register(0), 1);
+        assert_eq!(cpu.read_register(1), 52);
     }
 }
 
