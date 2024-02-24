@@ -39,7 +39,7 @@ impl RAM {
         self.memory[RAM_OFFSET + offset]
     }
 
-    pub fn show(&self, from: usize, to: usize) {
+    pub fn show(&self, from: usize, mut to: usize) {
         if from % 2 != 0 {
             panic!("From argument needs to be even");
         }
@@ -47,6 +47,7 @@ impl RAM {
             panic!("To argument needs to be even");
         }
         let mut current = RAM_OFFSET + from;
+        to += RAM_OFFSET;
         while current < to {
             let number = ((self.memory[current] as u16) << 8) | self.memory[current + 1] as u16;
             println!("{}: {:04X}", current, number);
