@@ -67,14 +67,20 @@ impl CPU {
                 (0, 0, 0xE, 0xE) => self.ret(),
                 (0x1, _, _, _) => self.jump(nnn),
                 (0x2, _, _, _) => self.call(nnn),
-                (0x3, _, _, _) => self.skip_if_equal_value(x, kk),
-                (0x4, _, _, _) => self.skip_if_not_equal_value(x, kk),
-                (0x5, _, _, 0) => self.skip_if_equal_registers(x, y),
-                (0x6, _, _, _) => self.put_in_register(x, kk),
-                (0x8, _, _, 0x4) => self.add(x, y),
+                (0x3, _, _, _) => self.skip_if_equal_x_to_kk(x, kk),
+                (0x4, _, _, _) => self.skip_if_not_equal_x_to_kk(x, kk),
+                (0x5, _, _, 0x0) => self.skip_if_equal_registers(x, y),
+                (0x6, _, _, _) => self.put_kk_in_x(x, kk),
+                (0x7, _, _, _) => self.add_kk_to_x(x, kk),
+                (0x8, _, _, 0x0) => self.put_y_in_x(x, y),
+                (0x8, _, _, 0x1) => self.or_y_in_x(x, y),
+                (0x8, _, _, 0x2) => self.and_y_in_x(x, y),
+                (0x8, _, _, 0x3) => self.xor_y_in_x(x, y),
+                (0x8, _, _, 0x4) => self.add_y_to_x(x, y),
+                (0x8, _, _, 0x5) => self.sub_y_from_x(x, y),
                 (0xA, _, _, _) => self.set_i(nnn),
-                (0xF, _, 0x5, 0x5) => self.copy_to_memory(x, ram),
-                (0xF, _, 0x6, 0x5) => self.copy_from_memory(x, ram),
+                (0xF, _, 0x5, 0x5) => self.copy_x_to_ram(x, ram),
+                (0xF, _, 0x6, 0x5) => self.copy_ram_to_x(x, ram),
                 _ => { return; }
                 // _ => todo!("opcode {:04x}", opcode)
             }
@@ -108,38 +114,68 @@ impl CPU {
         self.program_counter = addr as usize;
     }
 
-    fn skip_if_equal_value(&mut self, register: u8, value: u8) {
+    fn skip_if_equal_x_to_kk(&mut self, register: u8, value: u8) {
         if self.registers[register as usize] == value {
             self.program_counter += 2;
         }
     }
 
-    fn skip_if_not_equal_value(&mut self, register: u8, value: u8){
+    fn skip_if_not_equal_x_to_kk(&mut self, register: u8, value: u8) {
         if self.registers[register as usize] != value {
             self.program_counter += 2;
         }
     }
 
-    fn skip_if_equal_registers(&mut self, register1: u8, register2: u8){
-        if self.registers[register1 as usize] == self.registers[register2 as usize]{
+    fn skip_if_equal_registers(&mut self, register1: u8, register2: u8) {
+        if self.registers[register1 as usize] == self.registers[register2 as usize] {
             self.program_counter += 2;
         }
     }
 
-    fn put_in_register(&mut self, register: u8, value: u8){
+    fn put_kk_in_x(&mut self, register: u8, value: u8) {
         self.registers[register as usize] = value;
     }
 
-    fn add(&mut self, x: u8, y: u8) {
-        // add x and y together
-        let arg1 = self.registers[x as usize];
-        let arg2 = self.registers[y as usize];
-        let (val, overflow) = arg1.overflowing_add(arg2);
-        self.registers[x as usize] = val;
+    fn add_kk_to_x(&mut self, register: u8, value: u8) {
+        let arg1 = self.registers[register as usize];
+        let (val, overflow) = arg1.overflowing_add(value);
+        self.registers[register as usize] = val;
         if overflow {
             self.registers[SPECIAL_REGISTER] = 1;
         } else {
             self.registers[SPECIAL_REGISTER] = 0;
+        }
+    }
+
+    fn put_y_in_x(&mut self, register1: u8, register2: u8) {
+        self.registers[register1 as usize] = self.registers[register2 as usize];
+    }
+
+    fn or_y_in_x(&mut self, register1: u8, register2: u8) {
+        self.registers[register1 as usize] |= self.registers[register2 as usize];
+    }
+
+    fn and_y_in_x(&mut self, register1: u8, register2: u8) {
+        self.registers[register1 as usize] &= self.registers[register2 as usize];
+    }
+
+    fn xor_y_in_x(&mut self, register1: u8, register2: u8) {
+        self.registers[register1 as usize] ^= self.registers[register2 as usize];
+    }
+
+    fn add_y_to_x(&mut self, register1: u8, register2: u8) {
+        self.add_kk_to_x(register1, self.registers[register2 as usize]);
+    }
+
+    fn sub_y_from_x(&mut self, register1: u8, register2: u8) {
+        let arg1 = self.registers[register1 as usize];
+        let arg2 = self.registers[register2 as usize];
+        let (val, overflow) = arg1.overflowing_sub(arg2);
+        self.registers[register1 as usize] = val;
+        if overflow {
+            self.registers[SPECIAL_REGISTER] = 0;
+        } else {
+            self.registers[SPECIAL_REGISTER] = 1;
         }
     }
 
@@ -148,14 +184,14 @@ impl CPU {
         self.i = nnn;
     }
 
-    fn copy_to_memory(&mut self, x: u8, ram: &mut RAM) {
+    fn copy_x_to_ram(&mut self, x: u8, ram: &mut RAM) {
         // copies the values of registers V0 through Vx into memory, starting at the address in i
         for nr in 0..x as usize + 1 {
             ram.set(self.i as usize + nr, self.registers[nr]);
         }
     }
 
-    fn copy_from_memory(&mut self, x: u8, ram: &mut RAM) {
+    fn copy_ram_to_x(&mut self, x: u8, ram: &mut RAM) {
         for nr in 0..x as usize + 1 {
             self.registers[nr] = ram.get((self.i as usize) + nr);
         }
@@ -174,6 +210,85 @@ mod tests {
         ram.set_u16(0, 0xA001);
         cpu.run(&mut ram);
         assert_eq!(cpu.i, 0x1);
+    }
+
+    #[test]
+    fn test_or_y_in_x() {
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+        ram.set_u16(0, 0x8011);
+        cpu.set_register(0, 0b001u8);
+        cpu.set_register(1, 0b101u8);
+        cpu.run(&mut ram);
+        assert_eq!(cpu.read_register(0), 0b101);
+    }
+
+    #[test]
+    fn test_and_y_in_x() {
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+        ram.set_u16(0, 0x8012);
+        cpu.set_register(0, 0b001u8);
+        cpu.set_register(1, 0b101u8);
+        cpu.run(&mut ram);
+        assert_eq!(cpu.read_register(0), 0b001);
+    }
+
+    #[test]
+    fn test_sub_y_from_x() {
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+        ram.set_u16(0, 0x8015);
+        cpu.set_register(0, 5);
+        cpu.set_register(1, 3);
+        cpu.run(&mut ram);
+        assert_eq!(cpu.read_register(0), 2);
+        assert_eq!(cpu.read_register(0xF), 1);
+    }
+
+    #[test]
+    fn test_sub_y_from_x_overflow() {
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+        ram.set_u16(0, 0x8015);
+        cpu.set_register(0, 5);
+        cpu.set_register(1, 6);
+        cpu.run(&mut ram);
+        assert_eq!(cpu.read_register(0), 255);
+        assert_eq!(cpu.read_register(0xF), 0);
+    }
+
+    #[test]
+    fn test_xor_y_in_x() {
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+        ram.set_u16(0, 0x8013);
+        cpu.set_register(0, 0b011u8);
+        cpu.set_register(1, 0b101u8);
+        cpu.run(&mut ram);
+        assert_eq!(cpu.read_register(0), 0b110);
+    }
+
+    #[test]
+    fn test_put_register_y_in_register_x() {
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+        cpu.set_register(0, 0);
+        cpu.set_register(1, 5);
+        ram.set_u16(0, 0x8010);
+        cpu.run(&mut ram);
+        assert_eq!(cpu.read_register(0), 5);
+        assert_eq!(cpu.read_register(1), 5);
+    }
+
+    #[test]
+    fn test_add_value() {
+        let mut cpu = create_cpu();
+        let mut ram = create_ram();
+        cpu.set_register(0, 1);
+        ram.set_u16(0, 0x7001);
+        cpu.run(&mut ram);
+        assert_eq!(cpu.read_register(0), 2);
     }
 
     #[test]
@@ -276,7 +391,7 @@ mod tests {
         assert_eq!(cpu.read_register(0), 4);
     }
 
-        #[test]
+    #[test]
     fn test_call() {
         // test both call and ret
         let mut cpu = create_cpu();
@@ -315,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add() {
+    fn test_add_registers() {
         let mut cpu = create_cpu();
         let mut ram = create_ram();
         cpu.set_register(0, 1);
