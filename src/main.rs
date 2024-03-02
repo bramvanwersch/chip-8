@@ -1,7 +1,6 @@
 mod cpu;
 mod ram;
 
-
 fn main() {
     let mut cpu = cpu::create_cpu();
     let mut ram = ram::create_ram();
