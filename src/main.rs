@@ -10,6 +10,7 @@ use drivers::{Display, Input};
 use ram::RAM;
 
 
+
 fn main() {
     let sdl_context = sdl2::init().unwrap();
     let display = Display::new(&sdl_context);
@@ -19,6 +20,5 @@ fn main() {
     let mut ram = RAM::new();
 
     while let Ok(keypad) = input.poll(){
-
     }
 }
