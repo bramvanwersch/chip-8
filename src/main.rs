@@ -1,10 +1,14 @@
-use crate::cpu::CPU;
-use crate::drivers::{Display, Input};
-use crate::ram::RAM;
+extern crate sdl2;
+extern crate rand;
 
 mod cpu;
 mod ram;
 mod drivers;
+
+use cpu::CPU;
+use drivers::{Display, Input};
+use ram::RAM;
+
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
