@@ -17,17 +17,18 @@ pub struct CPU {
     //TODO: add the time and sound registers, decreasing at 60 Hz
 }
 
-pub fn create_cpu() -> CPU {
-    CPU {
-        program_counter: 0,
-        registers: [0; 16],
-        stack: [0; STACK_SIZE],
-        stack_pointer: 0,
-        i: 0x0,
-    }
-}
-
 impl CPU {
+
+    pub(crate) fn new() -> Self{
+        CPU {
+            program_counter: 0,
+            registers: [0; 16],
+            stack: [0; STACK_SIZE],
+            stack_pointer: 0,
+            i: 0x0,
+        }
+    }
+
     fn read_opcode(&self, ram: &RAM) -> u16 {
         let p = self.program_counter;
         let op_byte1 = ram.get(p) as u16;
@@ -295,13 +296,13 @@ impl CPU {
 
 #[cfg(test)]
 mod tests {
-    use crate::cpu::{create_cpu, SPECIAL_REGISTER};
-    use crate::ram::create_ram;
+    use crate::cpu::{CPU, SPECIAL_REGISTER};
+    use crate::ram::{RAM};
 
     #[test]
     fn test_set_i() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0xA001);
         cpu.run(&mut ram);
         assert_eq!(cpu.i, 0x1);
@@ -309,8 +310,8 @@ mod tests {
 
     #[test]
     fn test_register_to_bcd() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0xF033);
         cpu.set_register(0, 129);
         cpu.run(&mut ram);
@@ -320,8 +321,8 @@ mod tests {
     }
     #[test]
     fn test_add_register_to_i() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0xF01E);
         cpu.set_register(0, 5);
         cpu.i = 2;
@@ -332,8 +333,8 @@ mod tests {
     #[test]
     fn test_random_and_value() {
         // just assert it runs
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0xC000);
         cpu.run(&mut ram);
         assert_eq!(cpu.read_register(0), 0);
@@ -341,8 +342,8 @@ mod tests {
 
     #[test]
     fn test_rshift_x_sig_1() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8006);
         cpu.set_register(0, 0b101);
         cpu.run(&mut ram);
@@ -352,8 +353,8 @@ mod tests {
 
     #[test]
     fn test_rshift_x_sig_2() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8006);
         cpu.set_register(0, 0b110);
         cpu.run(&mut ram);
@@ -363,8 +364,8 @@ mod tests {
 
     #[test]
     fn test_lshift_x_sig_1() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x800E);
         cpu.set_register(0, 0b10001010);
         cpu.run(&mut ram);
@@ -374,8 +375,8 @@ mod tests {
 
     #[test]
     fn test_lshift_x_sig_2() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x800E);
         cpu.set_register(0, 0b01001010);
         cpu.run(&mut ram);
@@ -385,8 +386,8 @@ mod tests {
 
     #[test]
     fn test_or_y_in_x() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8011);
         cpu.set_register(0, 0b001u8);
         cpu.set_register(1, 0b101u8);
@@ -396,8 +397,8 @@ mod tests {
 
     #[test]
     fn test_and_y_in_x() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8012);
         cpu.set_register(0, 0b001u8);
         cpu.set_register(1, 0b101u8);
@@ -407,8 +408,8 @@ mod tests {
 
     #[test]
     fn test_sub_y_from_x() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8015);
         cpu.set_register(0, 5);
         cpu.set_register(1, 3);
@@ -419,8 +420,8 @@ mod tests {
 
     #[test]
     fn test_sub_y_from_x_overflow() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8015);
         cpu.set_register(0, 5);
         cpu.set_register(1, 6);
@@ -431,8 +432,8 @@ mod tests {
 
     #[test]
     fn test_sub_x_from_y() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8017);
         cpu.set_register(0, 3);
         cpu.set_register(1, 5);
@@ -443,8 +444,8 @@ mod tests {
 
     #[test]
     fn test_sub_x_from_y_overflow() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8017);
         cpu.set_register(0, 6);
         cpu.set_register(1, 5);
@@ -455,8 +456,8 @@ mod tests {
 
     #[test]
     fn test_xor_y_in_x() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x8013);
         cpu.set_register(0, 0b011u8);
         cpu.set_register(1, 0b101u8);
@@ -466,8 +467,8 @@ mod tests {
 
     #[test]
     fn test_put_register_y_in_register_x() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 0);
         cpu.set_register(1, 5);
         ram.set_u16(0, 0x8010);
@@ -478,8 +479,8 @@ mod tests {
 
     #[test]
     fn test_add_value() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         ram.set_u16(0, 0x7001);
         cpu.run(&mut ram);
@@ -488,8 +489,8 @@ mod tests {
 
     #[test]
     fn test_set_register() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         ram.set_u16(0, 0x6009);
         cpu.run(&mut ram);
         assert_eq!(cpu.read_register(0), 9);
@@ -497,8 +498,8 @@ mod tests {
 
     #[test]
     fn test_jump() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
         ram.set_u16(0, 0x1004);
@@ -512,8 +513,8 @@ mod tests {
 
     #[test]
     fn test_jump_plus_v0() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 2);
         cpu.set_register(1, 5);
         ram.set_u16(0, 0xB002);
@@ -528,8 +529,8 @@ mod tests {
     #[test]
     fn test_skip_if_equal_value1() {
         // check skip if equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
         ram.set_u16(0, 0x3102);
@@ -541,8 +542,8 @@ mod tests {
     #[test]
     fn test_skip_if_equal_value2() {
         // check not skip[ if not equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
         ram.set_u16(0, 0x3103);
@@ -554,8 +555,8 @@ mod tests {
     #[test]
     fn test_skip_if_not_equal_value1() {
         // check skip if equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 6);
         ram.set_u16(0, 0x4102);
@@ -567,8 +568,8 @@ mod tests {
     #[test]
     fn test_skip_if_not_equal_value2() {
         // check not skip[ if not equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 2);
         cpu.set_register(1, 3);
         ram.set_u16(0, 0x4002);
@@ -580,8 +581,8 @@ mod tests {
     #[test]
     fn test_skip_if_equal_registers1() {
         // check skip if equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 1);
         ram.set_u16(0, 0x5010);
@@ -593,8 +594,8 @@ mod tests {
     #[test]
     fn test_skip_if_equal_registers2() {
         // check not skip[ if not equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 3);
         ram.set_u16(0, 0x5010);
@@ -606,8 +607,8 @@ mod tests {
     #[test]
     fn test_skip_if_not_equal_registers1() {
         // check skip if equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
         ram.set_u16(0, 0x9010);
@@ -619,8 +620,8 @@ mod tests {
     #[test]
     fn test_skip_if_not_equal_registers2() {
         // check not skip[ if not equal
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 1);
         ram.set_u16(0, 0x9010);
@@ -632,8 +633,8 @@ mod tests {
     #[test]
     fn test_call() {
         // test both call and ret
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
         let add_call: [u8; 4] = [
@@ -652,8 +653,8 @@ mod tests {
     #[should_panic(expected = "Stack overflow, max call stack is 16!")]
     fn test_stack_overflow() {
         // test both call and ret
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
         let add_call: [u8; 6] = [
@@ -669,8 +670,8 @@ mod tests {
 
     #[test]
     fn test_add_registers() {
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
         ram.set_u16(0, 0x8014);
@@ -682,8 +683,8 @@ mod tests {
     #[test]
     fn test_add_overflow() {
         // integer simply overflows
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 255);
         ram.set_u16(0, 0x8014);
@@ -695,8 +696,8 @@ mod tests {
     #[test]
     fn test_copy_to_memory() {
         // integer simply overflows
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 255);
         cpu.set_register(2, 2);
@@ -714,8 +715,8 @@ mod tests {
     #[test]
     fn test_copy_from_memory() {
         // integer simply overflows
-        let mut cpu = create_cpu();
-        let mut ram = create_ram();
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
 
         ram.set_u16(0, 0xA010);
         ram.set_u16(2, 0xF265);

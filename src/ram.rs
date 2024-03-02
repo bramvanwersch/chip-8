@@ -9,13 +9,14 @@ pub struct RAM {
     // 512 bytes reserved --> 0x200
 }
 
-pub fn create_ram() -> RAM{
-    RAM {
-        memory: [0; RAM_SIZE]
-    }
-}
-
 impl RAM {
+
+    pub fn new() -> Self{
+        RAM {
+            memory: [0; RAM_SIZE]
+        }
+    }
+
     pub fn set(&mut self, offset: usize, value: u8) {
         self.memory[RAM_OFFSET + offset] = value;
     }
