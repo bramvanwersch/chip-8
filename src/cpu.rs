@@ -1,5 +1,6 @@
-use crate::ram::RAM;
+use crate::ram::{RAM, RAM_OFFSET};
 use rand::Rng;
+use crate::drivers::Display;
 
 const STACK_SIZE: usize = 0x10;
 // 16
@@ -28,7 +29,7 @@ impl CPU {
     }
 
     fn read_opcode(&self, ram: &RAM) -> u16 {
-        let p = self.program_counter;
+        let p = RAM_OFFSET + self.program_counter;
         let op_byte1 = ram.get(p) as u16;
         let op_byte2 = ram.get(p + 1) as u16;
         op_byte1 << 8 | op_byte2
@@ -43,7 +44,7 @@ impl CPU {
     }
 
     // run all RAM instructions
-    pub fn tick(&mut self, ram: &mut RAM, keypad: &[bool; 16]) -> bool {
+    pub fn tick(&mut self, ram: &mut RAM, keypad: Option<&[bool; 16]>, display: Option<&mut Display>) -> bool {
         let opcode = self.read_opcode(ram);
         self.program_counter += 2;
 
@@ -58,11 +59,10 @@ impl CPU {
 
         let nnn = opcode & 0x0FFF;
         let kk = (opcode & 0x00FF) as u8;
-        // println!("Instruction: {:04X}", opcode);
 
         match (c, x, y, d) {
             (0, 0, 0, 0) => { return false; }
-            (0, 0, 0, 0xE) => self.clear_display(),
+            (0, 0, 0, 0xE) => self.clear_display(display.unwrap()),
             (0, 0, 0xE, 0xE) => self.ret(),
             (0x1, _, _, _) => self.jump(nnn),
             (0x2, _, _, _) => self.call(nnn),
@@ -85,10 +85,10 @@ impl CPU {
             (0xB, _, _, _) => self.jump_plus_v0(nnn),
             (0xC, _, _, _) => self.random_and_value(x, kk),
             (0xD, _, _, _) => self.draw(x, y, d),
-            (0xE, _, 0x9, 0xE) => self.skip_if_key_pressed(x, keypad),
-            (0xE, _, 0xA, 0xE) => self.skip_if_key_not_pressed(x, keypad),
+            (0xE, _, 0x9, 0xE) => self.skip_if_key_pressed(x, keypad.unwrap()),
+            (0xE, _, 0xA, 0xE) => self.skip_if_key_not_pressed(x, keypad.unwrap()),
             (0xF, _, 0x0, 0x7) => self.set_register_to_delay(x),
-            (0xF, _, 0x0, 0xA) => self.await_key_press(x, keypad),
+            (0xF, _, 0x0, 0xA) => self.await_key_press(x, keypad.unwrap()),
             (0xF, _, 0x1, 0x5) => self.set_delay_to_register(x),
             (0xF, _, 0x1, 0x8) => self.set_sound_to_register(x),
             (0xF, _, 0x1, 0xE) => self.add_register_to_i(x),
@@ -101,8 +101,8 @@ impl CPU {
         true
     }
 
-    fn clear_display(&mut self) {
-        todo!("Clear display is missing implementation");
+    fn clear_display(&mut self, display: &mut Display) {
+        display.clear_display();
     }
 
     fn ret(&mut self) {
@@ -293,16 +293,15 @@ impl CPU {
 #[cfg(test)]
 mod tests {
     use crate::cpu::{CPU, SPECIAL_REGISTER};
-    use crate::ram::{RAM};
+    use crate::ram::{RAM, RAM_OFFSET};
 
     #[test]
     fn test_set_i() {
-        let keypad = [false; 16];
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0xA001);
+        ram.set_u16(RAM_OFFSET, 0xA001);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -311,13 +310,12 @@ mod tests {
 
     #[test]
     fn test_register_to_bcd() {
-        let keypad = [false; 16];
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0xF033);
+        ram.set_u16(RAM_OFFSET, 0xF033);
         cpu.set_register(0, 129);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -328,14 +326,13 @@ mod tests {
 
     #[test]
     fn test_add_register_to_i() {
-        let keypad = [false; 16];
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0xF01E);
+        ram.set_u16(RAM_OFFSET, 0xF01E);
         cpu.set_register(0, 5);
         cpu.i = 2;
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -344,13 +341,12 @@ mod tests {
 
     #[test]
     fn test_random_and_value() {
-        let keypad = [false; 16];
         // just assert it runs
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0xC000);
+        ram.set_u16(RAM_OFFSET, 0xC000);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -359,13 +355,12 @@ mod tests {
 
     #[test]
     fn test_rshift_x_sig_1() {
-        let keypad = [false; 16];
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8006);
+        ram.set_u16(RAM_OFFSET, 0x8006);
         cpu.set_register(0, 0b101);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -375,14 +370,12 @@ mod tests {
 
     #[test]
     fn test_rshift_x_sig_2() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8006);
+        ram.set_u16(RAM_OFFSET, 0x8006);
         cpu.set_register(0, 0b110);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -392,14 +385,12 @@ mod tests {
 
     #[test]
     fn test_lshift_x_sig_1() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x800E);
+        ram.set_u16(RAM_OFFSET, 0x800E);
         cpu.set_register(0, 0b10001010);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -409,14 +400,12 @@ mod tests {
 
     #[test]
     fn test_lshift_x_sig_2() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x800E);
+        ram.set_u16(RAM_OFFSET, 0x800E);
         cpu.set_register(0, 0b01001010);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -426,15 +415,13 @@ mod tests {
 
     #[test]
     fn test_or_y_in_x() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8011);
+        ram.set_u16(RAM_OFFSET, 0x8011);
         cpu.set_register(0, 0b001u8);
         cpu.set_register(1, 0b101u8);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -443,15 +430,13 @@ mod tests {
 
     #[test]
     fn test_and_y_in_x() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8012);
+        ram.set_u16(RAM_OFFSET, 0x8012);
         cpu.set_register(0, 0b001u8);
         cpu.set_register(1, 0b101u8);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -460,15 +445,13 @@ mod tests {
 
     #[test]
     fn test_sub_y_from_x() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8015);
+        ram.set_u16(RAM_OFFSET, 0x8015);
         cpu.set_register(0, 5);
         cpu.set_register(1, 3);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -478,15 +461,13 @@ mod tests {
 
     #[test]
     fn test_sub_y_from_x_overflow() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8015);
+        ram.set_u16(RAM_OFFSET, 0x8015);
         cpu.set_register(0, 5);
         cpu.set_register(1, 6);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -496,15 +477,13 @@ mod tests {
 
     #[test]
     fn test_sub_x_from_y() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8017);
+        ram.set_u16(RAM_OFFSET, 0x8017);
         cpu.set_register(0, 3);
         cpu.set_register(1, 5);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -514,15 +493,13 @@ mod tests {
 
     #[test]
     fn test_sub_x_from_y_overflow() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8017);
+        ram.set_u16(RAM_OFFSET, 0x8017);
         cpu.set_register(0, 6);
         cpu.set_register(1, 5);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -532,15 +509,13 @@ mod tests {
 
     #[test]
     fn test_xor_y_in_x() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x8013);
+        ram.set_u16(RAM_OFFSET, 0x8013);
         cpu.set_register(0, 0b011u8);
         cpu.set_register(1, 0b101u8);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -549,15 +524,13 @@ mod tests {
 
     #[test]
     fn test_put_register_y_in_register_x() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 0);
         cpu.set_register(1, 5);
-        ram.set_u16(0, 0x8010);
+        ram.set_u16(RAM_OFFSET, 0x8010);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -567,13 +540,12 @@ mod tests {
 
     #[test]
     fn test_add_value() {
-        let keypad = [false; 16];
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
-        ram.set_u16(0, 0x7001);
+        ram.set_u16(RAM_OFFSET, 0x7001);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -582,13 +554,11 @@ mod tests {
 
     #[test]
     fn test_set_register() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
-        ram.set_u16(0, 0x6009);
+        ram.set_u16(RAM_OFFSET, 0x6009);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -597,16 +567,14 @@ mod tests {
 
     #[test]
     fn test_jump() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
-        ram.set_u16(0, 0x1004);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x1004);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }        // goes up by 2 from the last terminating instruction
@@ -617,16 +585,14 @@ mod tests {
 
     #[test]
     fn test_jump_plus_v0() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 2);
         cpu.set_register(1, 5);
-        ram.set_u16(0, 0xB002);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0xB002);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }        // goes up by 2 from the last terminating instruction
@@ -637,17 +603,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_equal_value1() {
-        let keypad = [false; 16];
-
         // check skip if equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
-        ram.set_u16(0, 0x3102);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x3102);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -656,17 +620,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_equal_value2() {
-        let keypad = [false; 16];
-
         // check not skip[ if not equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
-        ram.set_u16(0, 0x3103);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x3103);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -675,17 +637,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_not_equal_value1() {
-        let keypad = [false; 16];
-
         // check skip if equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 6);
-        ram.set_u16(0, 0x4102);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x4102);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -694,17 +654,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_not_equal_value2() {
-        let keypad = [false; 16];
-
         // check not skip[ if not equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 2);
         cpu.set_register(1, 3);
-        ram.set_u16(0, 0x4002);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x4002);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -713,17 +671,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_equal_registers1() {
-        let keypad = [false; 16];
-
         // check skip if equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 1);
-        ram.set_u16(0, 0x5010);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x5010);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -732,17 +688,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_equal_registers2() {
-        let keypad = [false; 16];
-
         // check not skip[ if not equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 3);
-        ram.set_u16(0, 0x5010);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x5010);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -751,17 +705,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_not_equal_registers1() {
-        let keypad = [false; 16];
-
         // check skip if equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
-        ram.set_u16(0, 0x9010);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x9010);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -770,17 +722,15 @@ mod tests {
 
     #[test]
     fn test_skip_if_not_equal_registers2() {
-        let keypad = [false; 16];
-
         // check not skip[ if not equal
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 1);
-        ram.set_u16(0, 0x9010);
-        ram.set_u16(2, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x9010);
+        ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -789,8 +739,6 @@ mod tests {
 
     #[test]
     fn test_call() {
-        let keypad = [false; 16];
-
         // test both call and ret
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
@@ -800,11 +748,11 @@ mod tests {
             0x80, 0x14,
             0x00, 0xEE
         ];
-        ram.set_u16(0, 0x2100);
-        ram.sets(0x100, &add_call);
+        ram.set_u16(RAM_OFFSET, 0x2100);
+        ram.sets(RAM_OFFSET + 0x100, &add_call);
 
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -815,8 +763,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Stack overflow, max call stack is 16!")]
     fn test_stack_overflow() {
-        let keypad = [false; 16];
-
         // test both call and ret
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
@@ -827,11 +773,11 @@ mod tests {
             0x21, 0x00,
             0x00, 0xEE
         ];
-        ram.set_u16(0, 0x2100);
-        ram.sets(0x100, &add_call);
+        ram.set_u16(RAM_OFFSET, 0x2100);
+        ram.sets(RAM_OFFSET + 0x100, &add_call);
 
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -839,15 +785,13 @@ mod tests {
 
     #[test]
     fn test_add_registers() {
-        let keypad = [false; 16];
-
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
-        ram.set_u16(0, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -857,16 +801,14 @@ mod tests {
 
     #[test]
     fn test_add_overflow() {
-        let keypad = [false; 16];
-
         // integer simply overflows
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 255);
-        ram.set_u16(0, 0x8014);
+        ram.set_u16(RAM_OFFSET, 0x8014);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -876,8 +818,6 @@ mod tests {
 
     #[test]
     fn test_copy_to_memory() {
-        let keypad = [false; 16];
-
         // integer simply overflows
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
@@ -886,10 +826,10 @@ mod tests {
         cpu.set_register(2, 2);
         cpu.set_register(3, 100);
 
-        ram.set_u16(0, 0xA010);
-        ram.set_u16(2, 0xF455);
+        ram.set_u16(RAM_OFFSET, 0xA010);
+        ram.set_u16(RAM_OFFSET + 2, 0xF455);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }
@@ -901,18 +841,16 @@ mod tests {
 
     #[test]
     fn test_copy_from_memory() {
-        let keypad = [false; 16];
-
         // integer simply overflows
         let mut cpu = CPU::new();
         let mut ram = RAM::new();
 
-        ram.set_u16(0, 0xA010);
-        ram.set_u16(2, 0xF265);
-        ram.set(0x10, 1);
-        ram.set(0x11, 52);
+        ram.set_u16(RAM_OFFSET, 0xA210);
+        ram.set_u16(RAM_OFFSET + 2, 0xF265);
+        ram.set(RAM_OFFSET + 0x10, 1);
+        ram.set(RAM_OFFSET + 0x11, 52);
         loop {
-            if !cpu.tick(&mut ram, &keypad) {
+            if !cpu.tick(&mut ram, None, None) {
                 break;
             }
         }

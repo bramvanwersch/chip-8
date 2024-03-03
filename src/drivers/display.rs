@@ -14,6 +14,7 @@ const HEIGHT: u32 = (PIXEL_HEIGHT as u32) * SCALE;
 
 pub struct Display {
     canvas: Canvas<Window>,
+    v_ram: [u8; (WIDTH * HEIGHT) as usize]
 }
 
 impl Display {
@@ -29,7 +30,14 @@ impl Display {
         canvas.clear();
         canvas.present();
         Display {
-            canvas
+            canvas,
+            v_ram: [0; (WIDTH * HEIGHT) as usize]
+        }
+    }
+
+    pub fn clear_display(&mut self){
+        for index in 0..self.v_ram.len(){
+            self.v_ram[index] = 0;
         }
     }
 }

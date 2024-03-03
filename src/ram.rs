@@ -1,4 +1,4 @@
-const RAM_OFFSET: usize = 0x200;
+pub(crate) const RAM_OFFSET: usize = 0x200;
 // 4096
 const RAM_SIZE: usize = 0x1000;
 
@@ -10,18 +10,26 @@ pub struct RAM {
 }
 
 impl RAM {
-
-    pub fn new() -> Self{
+    pub fn new() -> Self {
+        let mut memory = [0; RAM_SIZE];
+        let mut count: usize = 0;
+        for value in LETTERS{
+            let high_byte = (value >> 8) as u8;
+            let low_byte = (value & 0xff) as u8;
+            memory[count] = high_byte;
+            memory[count + 1] = low_byte;
+            count += 2;
+        }
         RAM {
-            memory: [0; RAM_SIZE]
+            memory
         }
     }
 
     pub fn set(&mut self, offset: usize, value: u8) {
-        self.memory[RAM_OFFSET + offset] = value;
+        self.memory[offset] = value;
     }
 
-    pub fn set_u16(&mut self, offset: usize, value: u16){
+    pub fn set_u16(&mut self, offset: usize, value: u16) {
         let high_byte = (value >> 8) as u8;
         let low_byte = (value & 0xff) as u8;
         self.set(offset, high_byte);
@@ -31,13 +39,13 @@ impl RAM {
     pub fn sets(&mut self, offset: usize, values: &[u8]) {
         let mut count: usize = 0;
         for val in values {
-            self.memory[RAM_OFFSET + offset + count] = *val;
+            self.memory[offset + count] = *val;
             count += 1;
         }
     }
 
     pub fn get(&self, offset: usize) -> u8 {
-        self.memory[RAM_OFFSET + offset]
+        self.memory[offset]
     }
 
     pub fn show(&self, from: usize, mut to: usize) {
@@ -56,3 +64,117 @@ impl RAM {
         }
     }
 }
+
+const LETTERS: [u16; 80] = [
+    // 0
+    0xF0,
+    0x90,
+    0x90,
+    0x90,
+    0xF0,
+
+    // 1
+    0x20,
+    0x60,
+    0x20,
+    0x20,
+    0x70,
+
+    // 2
+    0xF0,
+    0x10,
+    0xF0,
+    0x80,
+    0xF0,
+
+    // 3
+    0xF0,
+    0x10,
+    0xF0,
+    0x10,
+    0xF0,
+
+    // 4
+    0x90,
+    0x90,
+    0xF0,
+    0x10,
+    0x10,
+
+    // 5
+    0xF0,
+    0x80,
+    0xF0,
+    0x10,
+    0xF0,
+
+    // 6
+    0xF0,
+    0x80,
+    0xF0,
+    0x90,
+    0xF0,
+
+    // 7
+    0xF0,
+    0x10,
+    0x20,
+    0x40,
+    0x40,
+
+    // 8
+    0xF0,
+    0x90,
+    0xF0,
+    0x90,
+    0xF0,
+
+    // 9
+    0xF0,
+    0x90,
+    0xF0,
+    0x10,
+    0xF0,
+
+    // A
+    0xF0,
+    0x90,
+    0xF0,
+    0x90,
+    0x90,
+
+    // B
+    0xE0,
+    0x90,
+    0xE0,
+    0x90,
+    0xE0,
+
+    // C
+    0xF0,
+    0x80,
+    0x80,
+    0x80,
+    0xF0,
+
+    // D
+    0xE0,
+    0x90,
+    0x90,
+    0x90,
+    0xE0,
+
+    // E
+    0xF0,
+    0x80,
+    0xF0,
+    0x80,
+    0xF0,
+
+    // F
+    0xF0,
+    0x80,
+    0xF0,
+    0x80,
+    0x80
+];
