@@ -1,7 +1,6 @@
-pub(crate) const RAM_OFFSET: usize = 0x200;
+pub const RAM_OFFSET: usize = 0x200;
 // 4096
-const RAM_SIZE: usize = 0x1000;
-
+pub const RAM_SIZE: usize = 0x1000;
 
 pub struct RAM {
     // 4096 bytes
@@ -13,6 +12,7 @@ impl RAM {
     pub fn new() -> Self {
         let mut memory = [0; RAM_SIZE];
         let mut count: usize = 0;
+        // set all the letters in memory
         for value in LETTERS{
             let high_byte = (value >> 8) as u8;
             let low_byte = (value & 0xff) as u8;
@@ -65,6 +65,7 @@ impl RAM {
     }
 }
 
+pub const LETTER_SIZE: usize = 5; // bytes
 const LETTERS: [u16; 80] = [
     // 0
     0xF0,

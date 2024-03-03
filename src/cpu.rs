@@ -1,4 +1,4 @@
-use crate::ram::{RAM, RAM_OFFSET};
+use crate::ram::{LETTER_SIZE, RAM, RAM_OFFSET};
 use rand::Rng;
 use crate::drivers::Display;
 
@@ -18,7 +18,7 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         CPU {
             program_counter: 0,
             registers: [0; 16],
@@ -60,6 +60,8 @@ impl CPU {
         let nnn = opcode & 0x0FFF;
         let kk = (opcode & 0x00FF) as u8;
 
+        println!("{:04X}", opcode);
+
         match (c, x, y, d) {
             (0, 0, 0, 0) => { return false; }
             (0, 0, 0, 0xE) => self.clear_display(display.unwrap()),
@@ -84,7 +86,7 @@ impl CPU {
             (0xA, _, _, _) => self.set_i(nnn),
             (0xB, _, _, _) => self.jump_plus_v0(nnn),
             (0xC, _, _, _) => self.random_and_value(x, kk),
-            (0xD, _, _, _) => self.draw(x, y, d),
+            (0xD, _, _, _) => self.draw(ram, x, y, d, display.unwrap()),
             (0xE, _, 0x9, 0xE) => self.skip_if_key_pressed(x, keypad.unwrap()),
             (0xE, _, 0xA, 0xE) => self.skip_if_key_not_pressed(x, keypad.unwrap()),
             (0xF, _, 0x0, 0x7) => self.set_register_to_delay(x),
@@ -96,7 +98,7 @@ impl CPU {
             (0xF, _, 0x3, 0x3) => self.register_to_bcd(x, ram),
             (0xF, _, 0x5, 0x5) => self.copy_x_to_ram(x, ram),
             (0xF, _, 0x6, 0x5) => self.copy_ram_to_x(x, ram),
-            _ => { return false; }
+            _ => { panic!("Invalid instruction {:04X}", opcode); }
         }
         true
     }
@@ -234,8 +236,13 @@ impl CPU {
         self.registers[register as usize] = rand::thread_rng().gen_range(0..=255) & value;
     }
 
-    fn draw(&mut self, _register1: u8, _register2: u8, _height: u8) {
-        todo!("Draw is missing implementation");
+    fn draw(&mut self, ram: &mut RAM, register1: u8, register2: u8, nr: u8, display: &mut Display) {
+        let x = self.registers[register1 as usize];
+        let y = self.registers[register2 as usize];
+        for increase in 0..nr{
+            let value = ram.get(self.i as usize + increase as usize);
+            display.draw(x, y + increase, value);
+        }
     }
 
     fn skip_if_key_pressed(&mut self, _register1: u8, _keypad: &[bool; 16]) {
@@ -267,7 +274,7 @@ impl CPU {
     }
 
     fn set_i_to_char_loc(&mut self, _register: u8) {
-        todo!("Set i to char is missing implementation");
+        self.i = (LETTER_SIZE * self.registers[_register as usize] as usize) as u16;
     }
 
     fn register_to_bcd(&mut self, register: u8, ram: &mut RAM) {
@@ -293,7 +300,7 @@ impl CPU {
 #[cfg(test)]
 mod tests {
     use crate::cpu::{CPU, SPECIAL_REGISTER};
-    use crate::ram::{RAM, RAM_OFFSET};
+    use crate::ram::{LETTER_SIZE, RAM, RAM_OFFSET};
 
     #[test]
     fn test_set_i() {
@@ -306,6 +313,34 @@ mod tests {
             }
         }
         assert_eq!(cpu.i, 0x1);
+    }
+
+    #[test]
+    fn test_set_i_to_char_loc() {
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
+        ram.set_u16(RAM_OFFSET, 0xF029);
+        cpu.set_register(0, 0);
+        loop {
+            if !cpu.tick(&mut ram, None, None) {
+                break;
+            }
+        }
+        assert_eq!(cpu.i, 0x0);
+    }
+
+    #[test]
+    fn test_set_i_to_char_loc_c() {
+        let mut cpu = CPU::new();
+        let mut ram = RAM::new();
+        ram.set_u16(RAM_OFFSET, 0xFC29);
+        cpu.set_register(0xCusize, 0xCu8);
+        loop {
+            if !cpu.tick(&mut ram, None, None) {
+                break;
+            }
+        }
+        assert_eq!(cpu.i, (LETTER_SIZE * 0xCusize) as u16);
     }
 
     #[test]
