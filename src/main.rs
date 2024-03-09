@@ -12,8 +12,7 @@ use crate::drivers::Cartridge;
 
 
 fn main() {
-    let file = "D:\\rust_projects\\chip_8\\test.txt";
-    println!("{}", file);
+    let file = "./test.txt";
     let sdl_context = sdl2::init().unwrap();
     let mut display = Display::new(&sdl_context);
     let mut input = Input::new(&sdl_context);
@@ -29,6 +28,6 @@ fn main() {
     }
     display.refresh();
 
-    while let Ok(keypad) = input.poll(){
+    while let Ok(_keypad) = input.poll(){
     }
 }

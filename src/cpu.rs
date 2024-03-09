@@ -233,12 +233,12 @@ impl CPU {
     }
 
     fn random_and_value(&mut self, register: u8, value: u8) {
-        self.registers[register as usize] = rand::thread_rng().gen_range(0..=255) & value;
+        self.set_register(register as usize, rand::thread_rng().gen_range(0..=255) & value);
     }
 
     fn draw(&mut self, ram: &mut RAM, register1: u8, register2: u8, nr: u8, display: &mut Display) {
-        let x = self.registers[register1 as usize];
-        let y = self.registers[register2 as usize];
+        let x = self.read_register(register1 as usize);
+        let y = self.read_register(register2 as usize);
         for increase in 0..nr{
             let value = ram.get(self.i as usize + increase as usize);
             display.draw(x, y + increase, value);

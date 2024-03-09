@@ -10,19 +10,11 @@ pub struct RAM {
 
 impl RAM {
     pub fn new() -> Self {
-        let mut memory = [0; RAM_SIZE];
-        let mut count: usize = 0;
+        let memory = [0; RAM_SIZE];
+        let mut ram = RAM { memory };
         // set all the letters in memory
-        for value in LETTERS{
-            let high_byte = (value >> 8) as u8;
-            let low_byte = (value & 0xff) as u8;
-            memory[count] = high_byte;
-            memory[count + 1] = low_byte;
-            count += 2;
-        }
-        RAM {
-            memory
-        }
+        ram.sets(0, &LETTERS);
+        ram
     }
 
     pub fn set(&mut self, offset: usize, value: u8) {
@@ -48,7 +40,7 @@ impl RAM {
         self.memory[offset]
     }
 
-    pub fn show(&self, from: usize, mut to: usize) {
+    pub fn _show(&self, from: usize, mut to: usize) {
         if from % 2 != 0 {
             panic!("From argument needs to be even");
         }
@@ -65,8 +57,9 @@ impl RAM {
     }
 }
 
-pub const LETTER_SIZE: usize = 5; // bytes
-const LETTERS: [u16; 80] = [
+pub const LETTER_SIZE: usize = 5;
+// bytes
+const LETTERS: [u8; 80] = [
     // 0
     0xF0,
     0x90,

@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, Read};
+use std::io::{BufRead};
 use std::path::Path;
-use crate::ram::{RAM, RAM_OFFSET, RAM_SIZE};
+use crate::ram::{RAM, RAM_OFFSET};
 
 pub struct Cartridge{
 }
