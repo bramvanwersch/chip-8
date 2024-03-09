@@ -273,8 +273,8 @@ impl CPU {
         self.i += self.registers[register as usize] as u16;
     }
 
-    fn set_i_to_char_loc(&mut self, _register: u8) {
-        self.i = (LETTER_SIZE * self.registers[_register as usize] as usize) as u16;
+    fn set_i_to_char_loc(&mut self, register: u8) {
+        self.i = (LETTER_SIZE * self.read_register(register as usize) as usize) as u16;
     }
 
     fn register_to_bcd(&mut self, register: u8, ram: &mut RAM) {
