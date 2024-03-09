@@ -4,19 +4,22 @@ use std::io::{BufRead};
 use std::path::Path;
 use crate::ram::{RAM, RAM_OFFSET};
 
-pub struct Cartridge{
-}
+pub struct Cartridge {}
 
-impl Cartridge{
-
-    pub fn read(filename: &str, ram: &mut RAM){
+impl Cartridge {
+    pub fn read(filename: &str, ram: &mut RAM) {
         match read_lines(filename) {
             Ok(lines) => {
-                for (index, line) in lines.flatten().enumerate() {
+                let mut offset = 0;
+                for line in lines.flatten() {
+                    if line.starts_with("#") {
+                        continue;
+                    }
                     let value = u16::from_str_radix(&line, 16).unwrap();
-                    ram.set_u16(RAM_OFFSET + index * 2, value);
+                    ram.set_u16(RAM_OFFSET + offset, value);
+                    offset += 2;
                 }
-            },
+            }
             Err(e) => {
                 panic!("{}", e);
             }

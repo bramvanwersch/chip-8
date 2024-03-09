@@ -71,7 +71,7 @@ impl CPU {
             (0x3, _, _, _) => self.skip_if_equal_x_to_kk(x, kk),
             (0x4, _, _, _) => self.skip_if_not_equal_x_to_kk(x, kk),
             (0x5, _, _, 0x0) => self.skip_if_equal_registers(x, y),
-            (0x6, _, _, _) => self.put_kk_in_x(x, kk),
+            (0x6, _, _, _) => self.put_value_in_register(x, kk),
             (0x7, _, _, _) => self.add_kk_to_x(x, kk),
             (0x8, _, _, 0x0) => self.put_y_in_x(x, y),
             (0x8, _, _, 0x1) => self.or_y_in_x(x, y),
@@ -148,8 +148,8 @@ impl CPU {
         }
     }
 
-    fn put_kk_in_x(&mut self, register: u8, value: u8) {
-        self.registers[register as usize] = value;
+    fn put_value_in_register(&mut self, register: u8, value: u8) {
+        self.set_register(register as usize, value);
     }
 
     fn add_kk_to_x(&mut self, register: u8, value: u8) {
@@ -239,7 +239,7 @@ impl CPU {
     fn draw(&mut self, ram: &mut RAM, register1: u8, register2: u8, nr: u8, display: &mut Display) {
         let x = self.read_register(register1 as usize);
         let y = self.read_register(register2 as usize);
-        for increase in 0..nr{
+        for increase in 0..nr {
             let value = ram.get(self.i as usize + increase as usize);
             display.draw(x, y + increase, value);
         }
@@ -889,7 +889,7 @@ mod tests {
                 break;
             }
         }
-        ram.show(0, 20);
+        ram._show(0, 20);
         assert_eq!(cpu.read_register(0), 1);
         assert_eq!(cpu.read_register(1), 52);
     }

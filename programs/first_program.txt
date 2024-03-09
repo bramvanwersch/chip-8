@@ -1,0 +1,8 @@
+# set i to char loc and draw
+F029
+D015
+# set register 0
+6005
+# set i and draw
+F129
+D015
