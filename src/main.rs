@@ -4,6 +4,7 @@ extern crate rand;
 mod cpu;
 mod ram;
 mod drivers;
+mod interpreter;
 
 use std::env;
 use cpu::CPU;

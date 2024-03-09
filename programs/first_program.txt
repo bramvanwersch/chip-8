@@ -1,4 +1,4 @@
-# set i to char loc and draw
+# set i to char loc and draw register 1 and 2 are already 0
 F229
 D015
 # set register 0 for drawing
