@@ -16,6 +16,10 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn interpret_line(&mut self, line: &mut Line) {
+        // ignore empty lines
+        if line.value.eq("") {
+            return;
+        }
         // ignore comment lines
         if line.value.starts_with("#") {
             return;
@@ -55,7 +59,7 @@ impl<'a> Interpreter<'a> {
             "SEP" => self.add_x_instruction(0xE, &values, 0x9E, line), // skip instruction of key is pressed
             "SENP" => self.add_x_instruction(0xE, &values, 0xAE, line),  // skip instruction if key is not pressed
             "STRD" => self.add_x_instruction(0xF, &values, 0x07, line), // set the value of register x to the remaining delay
-            "WTP" => self.add_x_instruction(0xF, &values, 0x0A, line), // halt execution until key x is pressed
+            "WTP" => self.add_x_instruction(0xF, &values, 0x0A, line), // halt execution until a key is pressed. This key is stored in register x
             "STDR" => self.add_x_instruction(0xF, &values, 0x15, line), // set the delay to the value in register x
             "STRS" => self.add_x_instruction(0xF, &values, 0x18, line), // set the sound to value in register x
             "ADDI" => self.add_x_instruction(0xF, &values, 0x1E, line), // add the value in register x to register i

@@ -27,13 +27,10 @@ fn main() {
     let mut ram = RAM::new();
     Cartridge::read(program, &mut ram);
 
-    loop {
-        if !cpu.tick(&mut ram, None, Some(&mut display)) {
+    while let Ok(keypad) = input.poll(){
+        if !cpu.tick(&mut ram, Some(&keypad), Some(&mut display)) {
             break;
         }
-    }
-    display.refresh();
-
-    while let Ok(_keypad) = input.poll(){
+        display.refresh();
     }
 }

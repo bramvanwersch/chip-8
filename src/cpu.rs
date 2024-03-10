@@ -60,8 +60,6 @@ impl CPU {
         let nnn = opcode & 0x0FFF;
         let kk = (opcode & 0x00FF) as u8;
 
-        println!("{:04X}", opcode);
-
         match (c, x, y, d) {
             (0, 0, 0, 0) => { return false; }
             (0, 0, 0, 0xE) => self.clear_display(display.unwrap()),
@@ -90,7 +88,7 @@ impl CPU {
             (0xE, _, 0x9, 0xE) => self.skip_if_key_pressed(x, keypad.unwrap()),
             (0xE, _, 0xA, 0xE) => self.skip_if_key_not_pressed(x, keypad.unwrap()),
             (0xF, _, 0x0, 0x7) => self.set_register_to_delay(x),
-            (0xF, _, 0x0, 0xA) => self.await_key_press(x, keypad.unwrap()),
+            (0xF, _, 0x0, 0xA) => self.await_any_key_press(x, keypad.unwrap()),
             (0xF, _, 0x1, 0x5) => self.set_delay_to_register(x),
             (0xF, _, 0x1, 0x8) => self.set_sound_to_register(x),
             (0xF, _, 0x1, 0xE) => self.add_register_to_i(x),
@@ -257,8 +255,14 @@ impl CPU {
         todo!("Register to delay is missing implementation");
     }
 
-    fn await_key_press(&mut self, _register: u8, _keypad: &[bool; 16]) {
-        todo!("Await key press is missing implementation");
+    fn await_any_key_press(&mut self, register: u8, keypad: &[bool; 16]) {
+        for (index, val) in keypad.iter().enumerate(){
+            if *val{
+                self.set_register(register as usize, index as u8);
+                return;
+            }
+        }
+        self.program_counter -= 2;
     }
 
     fn set_delay_to_register(&mut self, _register: u8) {
