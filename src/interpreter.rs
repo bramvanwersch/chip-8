@@ -2,7 +2,7 @@ use crate::drivers::Line;
 use crate::ram::{RAM, RAM_OFFSET};
 
 pub struct Interpreter<'a> {
-    // TODO make reference with lifetime --> figure it out
+    // TODO see if we can escalate a panic up
     ram: &'a mut RAM,
     offset: usize,
 }
@@ -11,7 +11,7 @@ impl<'a> Interpreter<'a> {
     pub fn new(ram: &'a mut RAM) -> Self {
         Interpreter {
             ram,
-            offset: 0
+            offset: 0,
         }
     }
 
@@ -30,6 +30,8 @@ impl<'a> Interpreter<'a> {
         match command {
             "EXT" => self.add_instruction(0x0000),
             "STIS" => self.add_x_instruction(0xF, &values, 0x29, line),
+            "DRW" => self.add_x_y_d_instruction(0xD, &values, line),
+            "STR" => self.add_x_kk_instruction(0x6, &values, line),
             // (0, 0, 0, 0xE) => self.clear_display(display.unwrap()),
             // (0, 0, 0xE, 0xE) => self.ret(),
             // (0x1, _, _, _) => self.jump(nnn),
@@ -52,7 +54,6 @@ impl<'a> Interpreter<'a> {
             // (0xA, _, _, _) => self.set_i(nnn),
             // (0xB, _, _, _) => self.jump_plus_v0(nnn),
             // (0xC, _, _, _) => self.random_and_value(x, kk),
-            // (0xD, _, _, _) => self.draw(ram, x, y, d, display.unwrap()),
             // (0xE, _, 0x9, 0xE) => self.skip_if_key_pressed(x, keypad.unwrap()),
             // (0xE, _, 0xA, 0xE) => self.skip_if_key_not_pressed(x, keypad.unwrap()),
             // (0xF, _, 0x0, 0x7) => self.set_register_to_delay(x),
@@ -60,7 +61,6 @@ impl<'a> Interpreter<'a> {
             // (0xF, _, 0x1, 0x5) => self.set_delay_to_register(x),
             // (0xF, _, 0x1, 0x8) => self.set_sound_to_register(x),
             // (0xF, _, 0x1, 0xE) => self.add_register_to_i(x),
-            // (0xF, _, 0x2, 0x9) => self.set_i_to_char_loc(x),
             // (0xF, _, 0x3, 0x3) => self.register_to_bcd(x, ram),
             // (0xF, _, 0x5, 0x5) => self.copy_x_to_ram(x, ram),
             // (0xF, _, 0x6, 0x5) => self.copy_ram_to_x(x, ram),
@@ -74,14 +74,33 @@ impl<'a> Interpreter<'a> {
     }
 
     fn add_x_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {
-        let x = match values.get(1) {
+        let x = self.get_u16_value(values, 1, current_line);
+        let instruction = start_instruction << 12 | x << 8 | end_instruction;
+        self.add_instruction(instruction);
+    }
+
+    fn add_x_y_d_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) {
+        let x = self.get_u16_value(values, 1, current_line);
+        let y = self.get_u16_value(values, 2, current_line);
+        let d = self.get_u16_value(values, 3, current_line);
+        let instruction = start_instruction << 12 | x << 8 | y << 4 | d;
+        self.add_instruction(instruction);
+    }
+
+    fn add_x_kk_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line){
+        let x = self.get_u16_value(values, 1, current_line);
+        let kk = self.get_u16_value(values, 2, current_line);
+        let instruction = start_instruction << 12 | x << 8 | kk;
+        self.add_instruction(instruction)
+    }
+
+    fn get_u16_value(&self, values: &Vec<&str>, index: usize, current_line: &Line) -> u16 {
+        let value = match values.get(index) {
             Some(c) => *c,
             // line empty return --> probably does not work as expected
             None => panic!("Incomplete instruction {}", current_line.panic_message())
         };
-        let nx = x.parse::<u16>().expect(format!("Invalid value for x {}", current_line.panic_message()).as_str());
-        let instruction = start_instruction << 12 | nx << 8 | end_instruction;
-        self.add_instruction(instruction);
+        u16::from_str_radix(value, 16).expect(format!("Invalid value for index {} {}", index, current_line.panic_message()).as_str())
     }
 }
 
@@ -112,20 +131,43 @@ mod tests {
         let line = Line::new("test", 1);
         interpreter.add_x_instruction(0xF, &values, 0x29, &line);
         assert_eq!(interpreter.offset, 2);
-        assert_eq!(ram.get(RAM_OFFSET), 0xFF);
-        assert_eq!(ram.get(RAM_OFFSET + 2), 0x29);
+        assert_eq!(ram.get(RAM_OFFSET), 0xFA);
+        assert_eq!(ram.get(RAM_OFFSET + 1), 0x29);
     }
 
     #[test]
-    #[should_panic(expected = "Invalid value for x at line 1 for 'test'")]
-    fn test_add_x_instruction_fail() {
+    fn get_u16_value() {
         let mut ram = RAM::new();
-        let mut interpreter = Interpreter::new(&mut ram);
+        let interpreter = Interpreter::new(&mut ram);
         let mut values: Vec<&str> = Vec::new();
         values.push("0");
-        values.push("H");
+        values.push("A");
         let line = Line::new("test", 1);
-        interpreter.add_x_instruction(0xF, &values, 0x29, &line);
+        let result = interpreter.get_u16_value(&values, 1, &line);
+        assert_eq!(result, 0xA);
+    }
+
+    #[test]
+    #[should_panic(expected = "Incomplete instruction at line 1 for 'test'")]
+    fn get_u16_value_fail1() {
+        let mut ram = RAM::new();
+        let interpreter = Interpreter::new(&mut ram);
+        let mut values: Vec<&str> = Vec::new();
+        values.push("0");
+        let line = Line::new("test", 1);
+        interpreter.get_u16_value(&values, 1, &line);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid value for index 1 at line 1 for 'test'")]
+    fn get_u16_value_fail2() {
+        let mut ram = RAM::new();
+        let interpreter = Interpreter::new(&mut ram);
+        let mut values: Vec<&str> = Vec::new();
+        values.push("0");
+        values.push("G");
+        let line = Line::new("test", 1);
+        interpreter.get_u16_value(&values, 1, &line);
     }
 
     #[test]

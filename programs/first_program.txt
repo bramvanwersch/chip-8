@@ -1,10 +1,11 @@
 # set i to char loc and draw register 1 and 2 are already 0
-F229
-D015
+STIS 2
+DRW 0 1 5
 # set register 0 for drawing
-6005
+STR 0 5
 # set register 2 for letter
-6201
+STR 2 1
 # set i and draw
-F229
-D015
+STIS 2
+DRW 0 1 5
+EXT
