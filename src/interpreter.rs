@@ -1,38 +1,35 @@
+use crate::drivers::Line;
 use crate::ram::{RAM, RAM_OFFSET};
 
-pub struct Interpreter<'a>{
+pub struct Interpreter<'a> {
     // TODO make reference with lifetime --> figure it out
-    ram: &'a RAM,
-    offset: usize
+    ram: &'a mut RAM,
+    offset: usize,
 }
 
-impl Interpreter{
-
-    pub fn new(ram: &RAM) -> Self{
-        Interpreter{
+impl<'a> Interpreter<'a> {
+    pub fn new(ram: &'a mut RAM) -> Self {
+        Interpreter {
             ram,
             offset: 0
         }
     }
 
-    pub fn interpret_line(&mut self, line: &str){
+    pub fn interpret_line(&mut self, line: &mut Line) {
         // ignore comment lines
-        if line.starts_with("#") {
+        if line.value.starts_with("#") {
             return;
         }
-        let values: Vec<&str> = line.split(" ").collect();
+        let values: Vec<&str> = line.value.split(" ").collect();
         // ignore empty lines
-        if values.len() == 0{
-            return;
-        }
-        let command = match values.get(0){
+        let command = match values.get(0) {
             Some(c) => *c,
             // line empty return --> probably does not work as expected
-            None() => return
+            None => return
         };
-        match (command) {
-            "EXT" => self.add_instruction(0x0000, ram),
-            // (0, 0, 0, 0) => { return false; }
+        match command {
+            "EXT" => self.add_instruction(0x0000),
+            "STIS" => self.add_x_instruction(0xF, &values, 0x29, line),
             // (0, 0, 0, 0xE) => self.clear_display(display.unwrap()),
             // (0, 0, 0xE, 0xE) => self.ret(),
             // (0x1, _, _, _) => self.jump(nnn),
@@ -67,28 +64,75 @@ impl Interpreter{
             // (0xF, _, 0x3, 0x3) => self.register_to_bcd(x, ram),
             // (0xF, _, 0x5, 0x5) => self.copy_x_to_ram(x, ram),
             // (0xF, _, 0x6, 0x5) => self.copy_ram_to_x(x, ram),
-            _ => { panic!("Invalid instruction {:04X}", opcode); }
+            _ => { panic!("Invalid instruction {}", command); }
         }
     }
 
-    fn add_instruction(&mut self, instruction: u16, ram: &mut RAM){
-        ram.set_u16(RAM_OFFSET + self.offset, instruction);
+    fn add_instruction(&mut self, instruction: u16) {
+        self.ram.set_u16(RAM_OFFSET + self.offset, instruction);
         self.offset += 2;
+    }
+
+    fn add_x_instruction(&mut self, mut start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {
+        let x = match values.get(1) {
+            Some(c) => *c,
+            // line empty return --> probably does not work as expected
+            None => panic!("Incomplete instruction {}", current_line.panic_message())
+        };
+        start_instruction = start_instruction << 12;
+        let nx = x.parse::<u16>().unwrap() << 8;
+        let instruction = start_instruction | nx | end_instruction;
+        self.add_instruction(instruction);
     }
 }
 
 
 #[cfg(test)]
 mod tests {
+    use crate::drivers::Line;
     use crate::interpreter::Interpreter;
     use crate::ram::{RAM, RAM_OFFSET};
 
     #[test]
     fn test_ignore_comment_line() {
         let mut ram = RAM::new();
-        let mut interpreter = Interpreter::new(&ram);
-        interpreter.interpret_line("# some data", &mut ram);
+        let mut interpreter = Interpreter::new(&mut ram);
+        let mut line = Line::new("# some data", 1);
+        interpreter.interpret_line(&mut line);
         assert_eq!(interpreter.offset, 0);
         assert_eq!(ram.get(RAM_OFFSET), 0);
+    }
+
+    #[test]
+    fn test_add_x_instruction() {
+        let mut ram = RAM::new();
+        let mut interpreter = Interpreter::new(&mut ram);
+        let mut values: Vec<&str> = Vec::new();
+        values.push("0");
+        values.push("H");
+        let line = Line::new("", 0);
+        interpreter.add_x_instruction(0xF, &values, 0x29, &line);
+    }
+
+    #[test]
+    fn test_interpret_ext() {
+        let mut ram = RAM::new();
+        let mut interpreter = Interpreter::new(&mut ram);
+        let mut line = Line::new("EXT", 1);
+        interpreter.interpret_line(&mut line);
+        assert_eq!(interpreter.offset, 2);
+        assert_eq!(ram.get(RAM_OFFSET), 0x00);
+        assert_eq!(ram.get(RAM_OFFSET + 1), 0x00);
+    }
+
+    #[test]
+    fn test_interpret_stis() {
+        let mut ram = RAM::new();
+        let mut interpreter = Interpreter::new(&mut ram);
+        let mut line = Line::new("STIS 1", 1);
+        interpreter.interpret_line(&mut line);
+        assert_eq!(interpreter.offset, 2);
+        assert_eq!(ram.get(RAM_OFFSET), 0xF1);
+        assert_eq!(ram.get(RAM_OFFSET + 1), 0x29);
     }
 }

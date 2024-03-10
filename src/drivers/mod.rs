@@ -4,4 +4,4 @@ mod cartridge;
 
 pub use self::display::Display;
 pub use self::input::Input;
-pub use self::cartridge::Cartridge;
+pub use self::cartridge::{Cartridge, Line};
