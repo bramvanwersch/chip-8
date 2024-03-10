@@ -28,42 +28,41 @@ impl<'a> Interpreter<'a> {
             None => return
         };
         match command {
-            "EXT" => self.add_instruction(0x0000),
-            "STIS" => self.add_x_instruction(0xF, &values, 0x29, line),
-            "DRW" => self.add_x_y_d_instruction(0xD, &values, line),
-            "STR" => self.add_x_kk_instruction(0x6, &values, line),
-            // (0, 0, 0, 0xE) => self.clear_display(display.unwrap()),
-            // (0, 0, 0xE, 0xE) => self.ret(),
-            // (0x1, _, _, _) => self.jump(nnn),
-            // (0x2, _, _, _) => self.call(nnn),
-            // (0x3, _, _, _) => self.skip_if_equal_x_to_kk(x, kk),
-            // (0x4, _, _, _) => self.skip_if_not_equal_x_to_kk(x, kk),
-            // (0x5, _, _, 0x0) => self.skip_if_equal_registers(x, y),
-            // (0x6, _, _, _) => self.put_value_in_register(x, kk),
-            // (0x7, _, _, _) => self.add_kk_to_x(x, kk),
-            // (0x8, _, _, 0x0) => self.put_y_in_x(x, y),
-            // (0x8, _, _, 0x1) => self.or_y_in_x(x, y),
-            // (0x8, _, _, 0x2) => self.and_y_in_x(x, y),
-            // (0x8, _, _, 0x3) => self.xor_y_in_x(x, y),
-            // (0x8, _, _, 0x4) => self.add_y_to_x(x, y),
-            // (0x8, _, _, 0x5) => self.sub_y_from_x(x, y),
-            // (0x8, _, 0x0, 0x6) => self.rshift_x(x),
-            // (0x8, _, _, 0x7) => self.sub_x_from_y(x, y),
-            // (0x8, _, 0x0, 0xE) => self.lshift_x(x),
-            // (0x9, _, _, 0x0) => self.skip_if_not_equal_registers(x, y),
-            // (0xA, _, _, _) => self.set_i(nnn),
-            // (0xB, _, _, _) => self.jump_plus_v0(nnn),
-            // (0xC, _, _, _) => self.random_and_value(x, kk),
-            // (0xE, _, 0x9, 0xE) => self.skip_if_key_pressed(x, keypad.unwrap()),
-            // (0xE, _, 0xA, 0xE) => self.skip_if_key_not_pressed(x, keypad.unwrap()),
-            // (0xF, _, 0x0, 0x7) => self.set_register_to_delay(x),
-            // (0xF, _, 0x0, 0xA) => self.await_key_press(x, keypad.unwrap()),
-            // (0xF, _, 0x1, 0x5) => self.set_delay_to_register(x),
-            // (0xF, _, 0x1, 0x8) => self.set_sound_to_register(x),
-            // (0xF, _, 0x1, 0xE) => self.add_register_to_i(x),
-            // (0xF, _, 0x3, 0x3) => self.register_to_bcd(x, ram),
-            // (0xF, _, 0x5, 0x5) => self.copy_x_to_ram(x, ram),
-            // (0xF, _, 0x6, 0x5) => self.copy_ram_to_x(x, ram),
+            "EXT" => self.add_instruction(0x0000), // exit
+            "CLD" => self.add_instruction(0x000E), // clear display
+            "RET" => self.add_instruction(0x00EE), // return subroutine
+            "JMP" => self.add_nnn_instruction(0x1, &values, line), // jump to memory location
+            "CLL" => self.add_nnn_instruction(0x2, &values, line), // call subroutine at
+            "SEV" => self.add_x_kk_instruction(0x3, &values, line), // Skip instruction if register x and kk are equal
+            "SNEV" => self.add_x_kk_instruction(0x4, &values, line), // skip instruction if register x and kk are not equal
+            "SER" => self.add_x_y_instruction(0x5, &values, 0x0, line), // skip instruction if register x and y are equal
+            "STV" => self.add_x_kk_instruction(0x6, &values, line), // set kk into register x
+            "ADDV" => self.add_x_kk_instruction(0x7, &values, line), // add kk to the value in register x
+            "STR" => self.add_x_y_instruction(0x8, &values, 0x0, line), // set the value of register y into register x
+            "OR" => self.add_x_y_instruction(0x8, &values, 0x1, line), // or the values of register y into x
+            "AND" => self.add_x_y_instruction(0x8, &values, 0x2, line), // and the values of register y into x
+            "XOR" => self.add_x_y_instruction(0x8, &values, 0x3, line), // xor the values of register y into x
+            "ADD" => self.add_x_y_instruction(0x8, &values, 0x4, line), // add the values of register y into x
+            "SUB" => self.add_x_y_instruction(0x8, &values, 0x5, line), // subtract the values of register y into x
+            "RSH" => self.add_x_instruction(0x8, &values, 0x06, line), // right shift the register value of x
+            "SUBR" => self.add_x_y_instruction(0x8, &values, 0x7, line), // subtract the values of register x from y and store in x
+            "LSH" => self.add_x_instruction(0x8, &values, 0x0E, line), // left shift the register value of x
+            "SNER" => self.add_x_y_instruction(0x9, &values, 0x0, line), // skip instruction if register x and y are not equal
+            "STI" => self.add_nnn_instruction(0xA, &values, line), // set the value of register i
+            "JMPR" => self.add_nnn_instruction(0xB, &values, line), // jump to location nnn plus the value of register 0
+            "RND" => self.add_x_kk_instruction(0xC, &values, line), // get a random byte and AND with kk
+            "DRW" => self.add_x_y_d_instruction(0xD, &values, line), // draw at coordinate of registers x, y for height d
+            "SEP" => self.add_x_instruction(0xE, &values, 0x9E, line), // skip instruction of key is pressed
+            "SENP" => self.add_x_instruction(0xE, &values, 0xAE, line),  // skip instruction if key is not pressed
+            "STRD" => self.add_x_instruction(0xF, &values, 0x07, line), // set the value of register x to the remaining delay
+            "WTP" => self.add_x_instruction(0xF, &values, 0x0A, line), // halt execution until key x is pressed
+            "STDR" => self.add_x_instruction(0xF, &values, 0x15, line), // set the delay to the value in register x
+            "STRS" => self.add_x_instruction(0xF, &values, 0x18, line), // set the sound to value in register x
+            "ADDI" => self.add_x_instruction(0xF, &values, 0x1E, line), // add the value in register x to register i
+            "STIS" => self.add_x_instruction(0xF, &values, 0x29, line), // set register i to point to the memory where the sprite for value x is stored
+            "BCD" => self.add_x_instruction(0xF, &values, 0x33, line), // set the bcd
+            "CTR" => self.add_x_instruction(0xF, &values, 0x55, line), // copy values from register 0 to register x into ram starting at address i
+            "CFR" => self.add_x_instruction(0xF, &values, 0x65, line), // copy values from ram into registers 0 to x starting at address i
             _ => { panic!("Invalid instruction {}", command); }
         }
     }
@@ -79,6 +78,13 @@ impl<'a> Interpreter<'a> {
         self.add_instruction(instruction);
     }
 
+    fn add_x_y_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {
+        let x = self.get_u16_value(values, 1, current_line);
+        let y = self.get_u16_value(values, 2, current_line);
+        let instruction = start_instruction << 12 | x << 8 | y << 4 | end_instruction;
+        self.add_instruction(instruction);
+    }
+
     fn add_x_y_d_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) {
         let x = self.get_u16_value(values, 1, current_line);
         let y = self.get_u16_value(values, 2, current_line);
@@ -87,11 +93,17 @@ impl<'a> Interpreter<'a> {
         self.add_instruction(instruction);
     }
 
-    fn add_x_kk_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line){
+    fn add_x_kk_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) {
         let x = self.get_u16_value(values, 1, current_line);
         let kk = self.get_u16_value(values, 2, current_line);
         let instruction = start_instruction << 12 | x << 8 | kk;
         self.add_instruction(instruction)
+    }
+
+    fn add_nnn_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) {
+        let nnn = self.get_u16_value(values, 1, current_line);
+        let instruction = start_instruction << 12 | nnn;
+        self.add_instruction(instruction);
     }
 
     fn get_u16_value(&self, values: &Vec<&str>, index: usize, current_line: &Line) -> u16 {
