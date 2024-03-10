@@ -73,15 +73,14 @@ impl<'a> Interpreter<'a> {
         self.offset += 2;
     }
 
-    fn add_x_instruction(&mut self, mut start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {
+    fn add_x_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {
         let x = match values.get(1) {
             Some(c) => *c,
             // line empty return --> probably does not work as expected
             None => panic!("Incomplete instruction {}", current_line.panic_message())
         };
-        start_instruction = start_instruction << 12;
-        let nx = x.parse::<u16>().unwrap() << 8;
-        let instruction = start_instruction | nx | end_instruction;
+        let nx = x.parse::<u16>().expect(format!("Invalid value for x {}", current_line.panic_message()).as_str());
+        let instruction = start_instruction << 12 | nx << 8 | end_instruction;
         self.add_instruction(instruction);
     }
 }
@@ -109,8 +108,23 @@ mod tests {
         let mut interpreter = Interpreter::new(&mut ram);
         let mut values: Vec<&str> = Vec::new();
         values.push("0");
+        values.push("A");
+        let line = Line::new("test", 1);
+        interpreter.add_x_instruction(0xF, &values, 0x29, &line);
+        assert_eq!(interpreter.offset, 2);
+        assert_eq!(ram.get(RAM_OFFSET), 0xFF);
+        assert_eq!(ram.get(RAM_OFFSET + 2), 0x29);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid value for x at line 1 for 'test'")]
+    fn test_add_x_instruction_fail() {
+        let mut ram = RAM::new();
+        let mut interpreter = Interpreter::new(&mut ram);
+        let mut values: Vec<&str> = Vec::new();
+        values.push("0");
         values.push("H");
-        let line = Line::new("", 0);
+        let line = Line::new("test", 1);
         interpreter.add_x_instruction(0xF, &values, 0x29, &line);
     }
 

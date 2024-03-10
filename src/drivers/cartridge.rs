@@ -38,7 +38,7 @@ impl<'a> Line<'a>{
     }
 
     pub fn panic_message(&self) -> String{
-        format!("at {} for {}", self.line_nr, self.value)
+        format!("at line {} for '{}'", self.line_nr, self.value)
     }
 }
 
