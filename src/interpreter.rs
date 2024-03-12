@@ -21,7 +21,7 @@ impl<'a> Interpreter<'a> {
             return;
         }
         // ignore comment lines
-        if line.value.starts_with("#") {
+        if line.value.starts_with("//") {
             return;
         }
         let values: Vec<&str> = line.value.split(" ").collect();
@@ -131,7 +131,7 @@ mod tests {
     fn test_ignore_comment_line() {
         let mut ram = RAM::new();
         let mut interpreter = Interpreter::new(&mut ram);
-        let mut line = Line::new("# some data", 1);
+        let mut line = Line::new("// some data", 1);
         interpreter.interpret_line(&mut line);
         assert_eq!(interpreter.offset, 0);
         assert_eq!(ram.get(RAM_OFFSET), 0);

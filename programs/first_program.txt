@@ -1,16 +1,16 @@
-# set i to char loc and draw register 1 and 2 are already 0
+// set i to char loc and draw register 1 and 2 are already 0
 STIS 2
 DRW 0 1 5
 
-# set register 0 for drawing
+// set register 0 for drawing
 STV 0 5
 # set register 2 for letter
 STV 2 1
 
-# set i and draw
+// set i and draw
 STIS 2
 DRW 0 1 5
 
-# wait until a key is pressed before exiting
+// wait until a key is pressed before exiting
 WTP 1
 EXT

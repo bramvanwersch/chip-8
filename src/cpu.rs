@@ -247,7 +247,7 @@ impl CPU {
         let value = self.read_register(register as usize);
         match keypad.get(value as usize){
             Some(pressed) => {
-                if pressed{
+                if *pressed{
                     self.program_counter += 2;
                 }
             },
@@ -259,7 +259,7 @@ impl CPU {
         let value = self.read_register(register as usize);
         match keypad.get(value as usize){
             Some(pressed) => {
-                if !pressed{
+                if !*pressed{
                     self.program_counter += 2;
                 }
             },
