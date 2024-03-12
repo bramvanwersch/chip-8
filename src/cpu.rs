@@ -243,13 +243,28 @@ impl CPU {
         }
     }
 
-    fn skip_if_key_pressed(&mut self, _register1: u8, _keypad: &[bool; 16]) {
-        todo!("Skip if key pressed is missing implementation");
+    fn skip_if_key_pressed(&mut self, register: u8, keypad: &[bool; 16]) {
+        let value = self.read_register(register as usize);
+        match keypad.get(value as usize){
+            Some(pressed) => {
+                if pressed{
+                    self.program_counter += 2;
+                }
+            },
+            None => panic!("Invalid key supplied; {}", value)
+        }
     }
 
-    fn skip_if_key_not_pressed(&mut self, _register: u8, _keypad: &[bool; 16]) {
-        todo!("Skip if key not pressed is missing implementation");
-    }
+    fn skip_if_key_not_pressed(&mut self, register: u8, keypad: &[bool; 16]) {
+        let value = self.read_register(register as usize);
+        match keypad.get(value as usize){
+            Some(pressed) => {
+                if !pressed{
+                    self.program_counter += 2;
+                }
+            },
+            None => panic!("Invalid key supplied; {}", value)
+        }    }
 
     fn set_register_to_delay(&mut self, _register: u8) {
         todo!("Register to delay is missing implementation");
