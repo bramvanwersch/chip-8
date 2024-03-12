@@ -1,17 +1,24 @@
+use std::collections::HashMap;
 use crate::drivers::Line;
 use crate::ram::{RAM, RAM_OFFSET};
 
 pub struct Interpreter<'a> {
     // TODO see if we can escalate a panic up
+    // TODO: make sure to place functions in memory
     ram: &'a mut RAM,
     offset: usize,
+    current_definition: Option<String>,
+    definition_map: HashMap<String, Vec<u16>>,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(ram: &'a mut RAM) -> Self {
+        let definition_map = HashMap::new();
         Interpreter {
             ram,
             offset: 0,
+            current_definition: None,
+            definition_map,
         }
     }
 
@@ -31,10 +38,15 @@ impl<'a> Interpreter<'a> {
             // line empty return --> probably does not work as expected
             None => return
         };
+        if command.starts_with("#") {
+            // is a special command like a function definition
+            self.read_special_command(command, &values);
+            return;
+        }
         match command {
             "EXT" => self.add_instruction(0x0000), // exit
             "CLD" => self.add_instruction(0x000E), // clear display
-            "RET" => self.add_instruction(0x00EE), // return subroutine
+            "RET" => self.add_ret_instruction(0x00EE), // return subroutine
             "JMP" => self.add_nnn_instruction(0x1, &values, line), // jump to memory location
             "CLL" => self.add_nnn_instruction(0x2, &values, line), // call subroutine at
             "SEV" => self.add_x_kk_instruction(0x3, &values, line), // Skip instruction if register x and kk are equal
@@ -71,9 +83,40 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    fn read_special_command(&mut self, command: &str, values: &Vec<&str>) {
+        match command {
+            "#f" => {
+                let name = match values.get(1){
+                    Some(v) => v,
+                    None => panic!("You need to provide a name when defining a function")
+                };
+                self.definition_map.insert(name.to_string(), Vec::new());
+                self.current_definition = Some(name.to_string());
+            }
+            _ => panic!("Syntax error unknown special command {}", command)
+        }
+    }
+
     fn add_instruction(&mut self, instruction: u16) {
+        match &self.current_definition {
+            Some(name) => {
+                match self.definition_map.get_mut(name){
+                    Some(vec) => vec.push(instruction),
+                    None => panic!("Failed to find current definition")
+                }
+            },
+            None => {
+                self.ram.set_u16(RAM_OFFSET + self.offset, instruction);
+                self.offset += 2;
+            }
+        }
+    }
+
+    fn add_ret_instruction(&mut self, instruction: u16){
+        // make sure to close the current definition
         self.ram.set_u16(RAM_OFFSET + self.offset, instruction);
         self.offset += 2;
+        self.current_definition = None;
     }
 
     fn add_x_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {

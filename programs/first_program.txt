@@ -4,7 +4,7 @@ DRW 0 1 5
 
 // set register 0 for drawing
 STV 0 5
-# set register 2 for letter
+// set register 2 for letter
 STV 2 1
 
 // set i and draw
