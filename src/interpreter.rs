@@ -22,26 +22,26 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn interpret_line(&mut self, line: &mut Line) {
+    pub fn interpret_line(&mut self, line: &mut Line) -> Option<&str> {
         // ignore empty lines
         if line.value.eq("") {
-            return;
+            return None;
         }
         // ignore comment lines
         if line.value.starts_with("//") {
-            return;
+            return None;
         }
         let values: Vec<&str> = line.value.split(" ").collect();
         // ignore empty lines
         let command = match values.get(0) {
             Some(c) => *c,
             // line empty return --> probably does not work as expected
-            None => return
+            None => return None
         };
         if command.starts_with("#") {
             // is a special command like a function definition
             self.read_special_command(command, &values);
-            return;
+            return None;
         }
         match command {
             "EXT" => self.add_instruction(0x0000), // exit
@@ -79,81 +79,87 @@ impl<'a> Interpreter<'a> {
             "BCD" => self.add_x_instruction(0xF, &values, 0x33, line), // set the bcd
             "CTR" => self.add_x_instruction(0xF, &values, 0x55, line), // copy values from register 0 to register x into ram starting at address i
             "CFR" => self.add_x_instruction(0xF, &values, 0x65, line), // copy values from ram into registers 0 to x starting at address i
-            _ => { panic!("Invalid instruction {}", command); }
+            _ => Some(format!("Invalid instruction {}", command).as_str())
         }
     }
 
-    fn read_special_command(&mut self, command: &str, values: &Vec<&str>) {
+    fn read_special_command(&mut self, command: &str, values: &Vec<&str>) -> Option<&str> {
         match command {
             "#f" => {
-                let name = match values.get(1){
-                    Some(v) => v,
-                    None => panic!("You need to provide a name when defining a function")
+                if self.current_definition != None {
+                    panic!("Cannot start a function in another function")
+                }
+                let name = match values.get(1) {
+                    Some(v) => *v,
+                    None => return Some("You need to provide a name when defining a function")
                 };
                 self.definition_map.insert(name.to_string(), Vec::new());
                 self.current_definition = Some(name.to_string());
+                None
             }
-            _ => panic!("Syntax error unknown special command {}", command)
+            _ => Some(format!("Syntax error unknown special command {}", command))
         }
     }
 
-    fn add_instruction(&mut self, instruction: u16) {
+    fn add_instruction(&mut self, instruction: u16) -> Option<&str> {
         match &self.current_definition {
             Some(name) => {
-                match self.definition_map.get_mut(name){
+                match self.definition_map.get_mut(name) {
                     Some(vec) => vec.push(instruction),
-                    None => panic!("Failed to find current definition")
+                    None => return Some("Failed to find current definition")
                 }
-            },
+            }
             None => {
                 self.ram.set_u16(RAM_OFFSET + self.offset, instruction);
                 self.offset += 2;
             }
         }
+        None
     }
 
-    fn add_ret_instruction(&mut self, instruction: u16){
+    fn add_ret_instruction(&mut self, instruction: u16) -> Option<&str> {
         // make sure to close the current definition
         self.ram.set_u16(RAM_OFFSET + self.offset, instruction);
         self.offset += 2;
         self.current_definition = None;
+        None
     }
 
-    fn add_x_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {
+    fn add_x_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) -> Option<&str> {
         let x = self.get_u16_value(values, 1, current_line);
         let instruction = start_instruction << 12 | x << 8 | end_instruction;
-        self.add_instruction(instruction);
+        self.add_instruction(instruction)
     }
 
-    fn add_x_y_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) {
+    fn add_x_y_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16, current_line: &Line) -> Option<&str> {
         let x = self.get_u16_value(values, 1, current_line);
         let y = self.get_u16_value(values, 2, current_line);
         let instruction = start_instruction << 12 | x << 8 | y << 4 | end_instruction;
-        self.add_instruction(instruction);
+        self.add_instruction(instruction)
     }
 
-    fn add_x_y_d_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) {
-        let x = self.get_u16_value(values, 1, current_line);
+    fn add_x_y_d_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) -> Option<&str> {
+        let x = self.get_u16_value(values, 1, current_line).and_then();
         let y = self.get_u16_value(values, 2, current_line);
         let d = self.get_u16_value(values, 3, current_line);
         let instruction = start_instruction << 12 | x << 8 | y << 4 | d;
-        self.add_instruction(instruction);
+        self.add_instruction(instruction)
     }
 
-    fn add_x_kk_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) {
+    fn add_x_kk_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) -> Option<&str> {
         let x = self.get_u16_value(values, 1, current_line);
         let kk = self.get_u16_value(values, 2, current_line);
         let instruction = start_instruction << 12 | x << 8 | kk;
         self.add_instruction(instruction)
     }
 
-    fn add_nnn_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) {
+    fn add_nnn_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, current_line: &Line) -> Option<&str> {
         let nnn = self.get_u16_value(values, 1, current_line);
         let instruction = start_instruction << 12 | nnn;
         self.add_instruction(instruction);
     }
 
-    fn get_u16_value(&self, values: &Vec<&str>, index: usize, current_line: &Line) -> u16 {
+    fn get_u16_value(&self, values: &Vec<&str>, index: usize, current_line: &Line) -> Result<u16, &str> {
         let value = match values.get(index) {
             Some(c) => *c,
             // line empty return --> probably does not work as expected
