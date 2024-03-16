@@ -1,0 +1,14 @@
+// draw 5 at coordinate 10, 10
+#f draw_5
+    // prepare number 5 in register
+    STV 2 5
+    STIS 2
+    // prepare coordinates
+    STV 0 A
+    STV 1 A
+    DRW 0 1 5
+    RET
+
+draw_5
+WTP 1
+EXT

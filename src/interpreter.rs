@@ -2,26 +2,28 @@ use std::collections::HashMap;
 use crate::ram::{RAM, RAM_OFFSET};
 
 pub struct Interpreter<'a> {
-    // TODO see if we can escalate a panic up
     // TODO: make sure to place functions in memory
     ram: &'a mut RAM,
     offset: usize,
-    current_definition: Option<String>,
+    current_function: Option<String>,
+    references: HashMap<String, Vec<usize>>,
     definition_map: HashMap<String, Vec<u16>>,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(ram: &'a mut RAM) -> Self {
         let definition_map = HashMap::new();
+        let references = HashMap::new();
         Interpreter {
             ram,
-            offset: 0,
-            current_definition: None,
+            offset: RAM_OFFSET,
+            current_function: None,
+            references,
             definition_map,
         }
     }
 
-    pub fn interpret_line(&mut self, line: &str) ->Result<bool, String> {
+    pub fn interpret_line(&mut self, line: &str) -> Result<bool, String> {
         // interpret a line and return an optional issue
         // ignore empty lines
         if line.eq("") {
@@ -32,10 +34,8 @@ impl<'a> Interpreter<'a> {
             return Ok(true);
         }
         let values: Vec<&str> = line.split(" ").collect();
-        // ignore empty lines
         let command = match values.get(0) {
             Some(c) => *c,
-            // line empty return --> probably does not work as expected
             None => return Ok(true)
         };
         if command.starts_with("#") {
@@ -78,66 +78,101 @@ impl<'a> Interpreter<'a> {
             "BCD" => self.add_x_instruction(0xF, &values, 0x33), // set the bcd
             "CTR" => self.add_x_instruction(0xF, &values, 0x55), // copy values from register 0 to register x into ram starting at address i
             "CFR" => self.add_x_instruction(0xF, &values, 0x65), // copy values from ram into registers 0 to x starting at address i
-            _ => Err(format!("Invalid instruction {}", command))
+            _ => self.set_reference(command, &values)
         }
     }
 
-    fn read_special_command(&mut self, command: &str, values: &Vec<&str>) ->Result<bool, String> {
+    fn read_special_command(&mut self, command: &str, values: &Vec<&str>) -> Result<bool, String> {
         match command {
             "#f" => {
-                if self.current_definition != None {
-                    return Err("Cannot start a function in another function".to_string())
+                if self.current_function != None {
+                    return Err("Cannot start a function in another function".to_string());
                 }
                 let name = match values.get(1) {
                     Some(v) => *v,
                     None => return Err("You need to provide a name when defining a function".to_string())
                 };
+                if self.definition_map.get(name).is_some() {
+                    return Err(format!("Redeclared function name {}", name));
+                }
                 self.definition_map.insert(name.to_string(), Vec::new());
-                self.current_definition = Some(name.to_string());
+                self.current_function = Some(name.to_string());
                 Ok(true)
             }
             _ => Err(format!("Syntax error unknown special command {}", command))
         }
     }
 
-    fn add_instruction(&mut self, instruction: u16) ->Result<bool, String> {
-        match &self.current_definition {
-            Some(name) => {
-                match self.definition_map.get_mut(name) {
-                    Some(vec) => vec.push(instruction),
-                    None => return Err("Failed to find current definition".to_string())
-                }
+    pub fn resolve_references(&mut self) {
+        // don't love this clone
+        for (key, instructions) in self.definition_map.clone().iter() {
+            let places = match self.references.get(key) {
+                Some(v) => v,
+                None => continue
+            };
+            let start_instruction = instructions.get(0).unwrap();
+            for place in places {
+                // call subroutine at correct place
+                let full_instruction = 0x1u16 << 12 | *start_instruction;
+                self.ram.set_u16(*place, full_instruction);
             }
+            for value in instructions {
+                self.add_instruction(*value).unwrap();
+            }
+        }
+    }
+
+    fn set_reference(&mut self, command: &str, _values: &Vec<&str>) -> Result<bool, String> {
+        if !self.definition_map.get(command).is_some() {
+            return Err(format!("Invalid instruction {}", command));
+        }
+        match self.references.get_mut(command) {
+            Some(vec) => vec.push(self.offset),
             None => {
-                self.ram.set_u16(RAM_OFFSET + self.offset, instruction);
+                let mut vec = Vec::new();
+                vec.push(self.offset);
+                self.references.insert(command.to_string(), vec);
+            }
+        };
+        // placeholder --> invalid instruction
+        self.add_instruction(0xFFFF)
+    }
+
+    fn add_instruction(&mut self, instruction: u16) -> Result<bool, String> {
+        match &self.current_function{
+            Some(name) => {
+                self.definition_map.get_mut(name).unwrap().push(instruction);
+            },
+            None =>{
+                self.ram.set_u16(self.offset, instruction);
                 self.offset += 2;
             }
         }
         Ok(true)
     }
 
-    fn add_ret_instruction(&mut self, instruction: u16) ->Result<bool, String> {
+    fn add_ret_instruction(&mut self, instruction: u16) -> Result<bool, String> {
         // make sure to close the current definition
-        self.ram.set_u16(RAM_OFFSET + self.offset, instruction);
+        self.ram.set_u16(self.offset, instruction);
         self.offset += 2;
-        self.current_definition = None;
+        self.current_function = None;
         Ok(true)
     }
 
-    fn add_x_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16) ->Result<bool, String> {
+    fn add_x_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16) -> Result<bool, String> {
         let x = self.get_u16_value(values, 1)?;
         let instruction = start_instruction << 12 | x << 8 | end_instruction;
         self.add_instruction(instruction)
     }
 
-    fn add_x_y_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16) ->Result<bool, String> {
+    fn add_x_y_instruction(&mut self, start_instruction: u16, values: &Vec<&str>, end_instruction: u16) -> Result<bool, String> {
         let x = self.get_u16_value(values, 1)?;
         let y = self.get_u16_value(values, 2)?;
         let instruction = start_instruction << 12 | x << 8 | y << 4 | end_instruction;
         self.add_instruction(instruction)
     }
 
-    fn add_x_y_d_instruction(&mut self, start_instruction: u16, values: &Vec<&str>) ->Result<bool, String> {
+    fn add_x_y_d_instruction(&mut self, start_instruction: u16, values: &Vec<&str>) -> Result<bool, String> {
         let x = self.get_u16_value(values, 1)?;
         let y = self.get_u16_value(values, 2)?;
         let d = self.get_u16_value(values, 3)?;
@@ -145,14 +180,14 @@ impl<'a> Interpreter<'a> {
         self.add_instruction(instruction)
     }
 
-    fn add_x_kk_instruction(&mut self, start_instruction: u16, values: &Vec<&str>) ->Result<bool, String> {
+    fn add_x_kk_instruction(&mut self, start_instruction: u16, values: &Vec<&str>) -> Result<bool, String> {
         let x = self.get_u16_value(values, 1)?;
         let kk = self.get_u16_value(values, 2)?;
         let instruction = start_instruction << 12 | x << 8 | kk;
         self.add_instruction(instruction)
     }
 
-    fn add_nnn_instruction(&mut self, start_instruction: u16, values: &Vec<&str>) ->Result<bool, String> {
+    fn add_nnn_instruction(&mut self, start_instruction: u16, values: &Vec<&str>) -> Result<bool, String> {
         let nnn = self.get_u16_value(values, 1)?;
         let instruction = start_instruction << 12 | nnn;
         self.add_instruction(instruction)
@@ -164,7 +199,7 @@ impl<'a> Interpreter<'a> {
             // line empty return --> probably does not work as expected
             None => return Err(format!("Invalid index '{}'", index))
         };
-        match u16::from_str_radix(value, 16){
+        match u16::from_str_radix(value, 16) {
             Ok(v) => Ok(v),
             Err(_) => Err(format!("Invalid u16 '{}'", value))
         }
@@ -182,7 +217,7 @@ mod tests {
         let mut ram = RAM::new();
         let mut interpreter = Interpreter::new(&mut ram);
         assert_eq!(interpreter.interpret_line("// some data"), Ok(true));
-        assert_eq!(interpreter.offset, 0);
+        assert_eq!(interpreter.offset, RAM_OFFSET);
         assert_eq!(ram.get(RAM_OFFSET), 0);
     }
 

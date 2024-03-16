@@ -40,6 +40,10 @@ impl RAM {
         self.memory[offset]
     }
 
+    pub fn get_u16(&self, offset: usize) -> u16 {
+        (self.memory[offset] as u16) << 8 | (self.memory[offset + 2] as u16)
+    }
+
     pub fn _show(&self, from: usize, mut to: usize) {
         if from % 2 != 0 {
             panic!("From argument needs to be even");
