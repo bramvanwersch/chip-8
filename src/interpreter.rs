@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use crate::ram::{RAM, RAM_OFFSET};
 
+
+
 pub struct Interpreter<'a> {
-    // TODO: make sure to place functions in memory
     ram: &'a mut RAM,
     offset: usize,
     current_function: Option<String>,
@@ -110,10 +111,9 @@ impl<'a> Interpreter<'a> {
                 Some(v) => v,
                 None => continue
             };
-            let start_instruction = instructions.get(0).unwrap();
             for place in places {
                 // call subroutine at correct place
-                let full_instruction = 0x1u16 << 12 | *start_instruction;
+                let full_instruction = (0x2u16 << 12) | self.offset as u16;
                 self.ram.set_u16(*place, full_instruction);
             }
             for value in instructions {
@@ -153,8 +153,7 @@ impl<'a> Interpreter<'a> {
 
     fn add_ret_instruction(&mut self, instruction: u16) -> Result<bool, String> {
         // make sure to close the current definition
-        self.ram.set_u16(self.offset, instruction);
-        self.offset += 2;
+        self.add_instruction(instruction).expect("if this panics i eat my sock");
         self.current_function = None;
         Ok(true)
     }
@@ -229,7 +228,7 @@ mod tests {
         values.push("0");
         values.push("A");
         assert_eq!(interpreter.add_x_instruction(0xF, &values, 0x29), Ok(true));
-        assert_eq!(interpreter.offset, 2);
+        assert_eq!(interpreter.offset, RAM_OFFSET + 2);
         assert_eq!(ram.get(RAM_OFFSET), 0xFA);
         assert_eq!(ram.get(RAM_OFFSET + 1), 0x29);
     }
@@ -269,7 +268,7 @@ mod tests {
         let mut ram = RAM::new();
         let mut interpreter = Interpreter::new(&mut ram);
         assert_eq!(interpreter.interpret_line("EXT"), Ok(true));
-        assert_eq!(interpreter.offset, 2);
+        assert_eq!(interpreter.offset, RAM_OFFSET + 2);
         assert_eq!(ram.get(RAM_OFFSET), 0x00);
         assert_eq!(ram.get(RAM_OFFSET + 1), 0x00);
     }
@@ -279,7 +278,7 @@ mod tests {
         let mut ram = RAM::new();
         let mut interpreter = Interpreter::new(&mut ram);
         assert_eq!(interpreter.interpret_line("STIS 1"), Ok(true));
-        assert_eq!(interpreter.offset, 2);
+        assert_eq!(interpreter.offset, RAM_OFFSET + 2);
         assert_eq!(ram.get(RAM_OFFSET), 0xF1);
         assert_eq!(ram.get(RAM_OFFSET + 1), 0x29);
     }

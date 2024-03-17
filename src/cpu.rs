@@ -20,7 +20,7 @@ pub struct CPU {
 impl CPU {
     pub fn new() -> Self {
         CPU {
-            program_counter: 0,
+            program_counter: RAM_OFFSET,
             registers: [0; 16],
             stack: [0; STACK_SIZE],
             stack_pointer: 0,
@@ -29,7 +29,7 @@ impl CPU {
     }
 
     fn read_opcode(&self, ram: &RAM) -> u16 {
-        let p = RAM_OFFSET + self.program_counter;
+        let p = self.program_counter;
         let op_byte1 = ram.get(p) as u16;
         let op_byte2 = ram.get(p + 1) as u16;
         op_byte1 << 8 | op_byte2
@@ -625,14 +625,15 @@ mod tests {
         let mut ram = RAM::new();
         cpu.set_register(0, 1);
         cpu.set_register(1, 2);
-        ram.set_u16(RAM_OFFSET, 0x1004);
+        ram.set_u16(RAM_OFFSET, 0x1204);
         ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
             if !cpu.tick(&mut ram, None, None) {
                 break;
             }
-        }        // goes up by 2 from the last terminating instruction
-        assert_eq!(cpu.program_counter, 6);
+        }
+        // goes up by 2 from the last terminating instruction
+        assert_eq!(cpu.program_counter, 518);
         // make sure that add was not run
         assert_eq!(cpu.read_register(0), 1);
     }
@@ -643,14 +644,15 @@ mod tests {
         let mut ram = RAM::new();
         cpu.set_register(0, 2);
         cpu.set_register(1, 5);
-        ram.set_u16(RAM_OFFSET, 0xB002);
+        ram.set_u16(RAM_OFFSET, 0xB204);
         ram.set_u16(RAM_OFFSET + 2, 0x8014);
         loop {
             if !cpu.tick(&mut ram, None, None) {
                 break;
             }
-        }        // goes up by 2 from the last terminating instruction
-        assert_eq!(cpu.program_counter, 6);
+        }
+        // goes up by 2 from the last terminating instruction
+        assert_eq!(cpu.program_counter, 520);
         // make sure that add was not run
         assert_eq!(cpu.read_register(0), 2);
     }
@@ -802,8 +804,8 @@ mod tests {
             0x80, 0x14,
             0x00, 0xEE
         ];
-        ram.set_u16(RAM_OFFSET, 0x2100);
-        ram.sets(RAM_OFFSET + 0x100, &add_call);
+        ram.set_u16(RAM_OFFSET, 0x2226);
+        ram.sets(0x226, &add_call);
 
         loop {
             if !cpu.tick(&mut ram, None, None) {
@@ -824,11 +826,11 @@ mod tests {
         cpu.set_register(1, 2);
         let add_call: [u8; 6] = [
             0x80, 0x14,
-            0x21, 0x00,
+            0x22, 0x26,
             0x00, 0xEE
         ];
-        ram.set_u16(RAM_OFFSET, 0x2100);
-        ram.sets(RAM_OFFSET + 0x100, &add_call);
+        ram.set_u16(RAM_OFFSET, 0x2226);
+        ram.sets(0x226, &add_call);
 
         loop {
             if !cpu.tick(&mut ram, None, None) {
@@ -908,7 +910,6 @@ mod tests {
                 break;
             }
         }
-        ram._show(0, 20);
         assert_eq!(cpu.read_register(0), 1);
         assert_eq!(cpu.read_register(1), 52);
     }

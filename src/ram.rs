@@ -41,20 +41,22 @@ impl RAM {
     }
 
     pub fn get_u16(&self, offset: usize) -> u16 {
-        (self.memory[offset] as u16) << 8 | (self.memory[offset + 2] as u16)
+        ((self.memory[offset] as u16) << 8) | self.memory[offset + 1] as u16
     }
 
-    pub fn _show(&self, from: usize, mut to: usize) {
+    pub fn _show(&self, from: usize, to: usize) {
         if from % 2 != 0 {
             panic!("From argument needs to be even");
         }
         if to % 2 != 0 {
             panic!("To argument needs to be even");
         }
-        let mut current = RAM_OFFSET + from;
-        to += RAM_OFFSET;
+        if from > to{
+            panic!("From must be bigger then to")
+        }
+        let mut current = from;
         while current < to {
-            let number = ((self.memory[current] as u16) << 8) | self.memory[current + 1] as u16;
+            let number = self.get_u16(current);
             println!("{}: {:04X}", current, number);
             current += 2;
         }
